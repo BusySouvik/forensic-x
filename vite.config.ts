@@ -215,6 +215,7 @@ export default defineConfig({
     },
   },
   envDir: path.resolve(import.meta.dirname),
+  // Keep the exported static app rooted at client/ so index.html resolves client/src/main.tsx.
   root: path.resolve(import.meta.dirname, "client"),
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
