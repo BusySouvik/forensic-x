@@ -1,0 +1,686 @@
+{
+  "id": "93b5887e-0c12-4433-8c09-61bc8cf9c700",
+  "prevId": "d4aafed1-2521-456b-a894-7df194f8d0aa",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.devices": {
+      "name": "devices",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "investigation_id": {
+          "name": "investigation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_identifier": {
+          "name": "device_identifier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_type": {
+          "name": "device_type",
+          "type": "device_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "manufacturer": {
+          "name": "manufacturer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "serial_number": {
+          "name": "serial_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "capacity": {
+          "name": "capacity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "connection_type": {
+          "name": "connection_type",
+          "type": "connection_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "device_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'REGISTERED'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "devices_investigation_identifier_unique": {
+          "name": "devices_investigation_identifier_unique",
+          "columns": [
+            {
+              "expression": "investigation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "device_identifier",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "devices_investigation_id_investigations_id_fk": {
+          "name": "devices_investigation_id_investigations_id_fk",
+          "tableFrom": "devices",
+          "tableTo": "investigations",
+          "columnsFrom": [
+            "investigation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.investigations": {
+      "name": "investigations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "investigation_number": {
+          "name": "investigation_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "status": {
+          "name": "status",
+          "type": "investigation_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'OPEN'"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "investigations_number_unique": {
+          "name": "investigations_number_unique",
+          "columns": [
+            {
+              "expression": "investigation_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "investigations_created_by_users_id_fk": {
+          "name": "investigations_created_by_users_id_fk",
+          "tableFrom": "investigations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.operation_authorizations": {
+      "name": "operation_authorizations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "investigation_id": {
+          "name": "investigation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requested_by": {
+          "name": "requested_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "approved_by": {
+          "name": "approved_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "operation_type": {
+          "name": "operation_type",
+          "type": "operation_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "authorization_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PENDING'"
+        },
+        "requested_at": {
+          "name": "requested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "operation_authorizations_investigation_id_investigations_id_fk": {
+          "name": "operation_authorizations_investigation_id_investigations_id_fk",
+          "tableFrom": "operation_authorizations",
+          "tableTo": "investigations",
+          "columnsFrom": [
+            "investigation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "operation_authorizations_device_id_devices_id_fk": {
+          "name": "operation_authorizations_device_id_devices_id_fk",
+          "tableFrom": "operation_authorizations",
+          "tableTo": "devices",
+          "columnsFrom": [
+            "device_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "operation_authorizations_requested_by_users_id_fk": {
+          "name": "operation_authorizations_requested_by_users_id_fk",
+          "tableFrom": "operation_authorizations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "requested_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "operation_authorizations_approved_by_users_id_fk": {
+          "name": "operation_authorizations_approved_by_users_id_fk",
+          "tableFrom": "operation_authorizations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "approved_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.storage_objects": {
+      "name": "storage_objects",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "investigation_id": {
+          "name": "investigation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "evidence_id": {
+          "name": "evidence_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "storage_class": {
+          "name": "storage_class",
+          "type": "storage_class",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bucket": {
+          "name": "bucket",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "object_key": {
+          "name": "object_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "original_filename": {
+          "name": "original_filename",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_size_bytes": {
+          "name": "file_size_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sha256": {
+          "name": "sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "storage_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'AVAILABLE'"
+        },
+        "deletion_policy": {
+          "name": "deletion_policy",
+          "type": "deletion_policy",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'DELETABLE'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "storage_objects_bucket_key_unique": {
+          "name": "storage_objects_bucket_key_unique",
+          "columns": [
+            {
+              "expression": "bucket",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "object_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "storage_objects_investigation_id_investigations_id_fk": {
+          "name": "storage_objects_investigation_id_investigations_id_fk",
+          "tableFrom": "storage_objects",
+          "tableTo": "investigations",
+          "columnsFrom": [
+            "investigation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "user_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.authorization_status": {
+      "name": "authorization_status",
+      "schema": "public",
+      "values": [
+        "PENDING",
+        "APPROVED",
+        "DENIED",
+        "EXPIRED",
+        "REVOKED"
+      ]
+    },
+    "public.connection_type": {
+      "name": "connection_type",
+      "schema": "public",
+      "values": [
+        "SATA",
+        "USB",
+        "NVME",
+        "NETWORK",
+        "OTHER"
+      ]
+    },
+    "public.deletion_policy": {
+      "name": "deletion_policy",
+      "schema": "public",
+      "values": [
+        "DELETABLE",
+        "MASTER_IMAGE_PROTECTED"
+      ]
+    },
+    "public.device_status": {
+      "name": "device_status",
+      "schema": "public",
+      "values": [
+        "REGISTERED",
+        "IN_CUSTODY",
+        "RELEASED"
+      ]
+    },
+    "public.device_type": {
+      "name": "device_type",
+      "schema": "public",
+      "values": [
+        "HDD",
+        "SSD",
+        "NVME",
+        "USB",
+        "MOBILE",
+        "OPTICAL",
+        "OTHER"
+      ]
+    },
+    "public.investigation_status": {
+      "name": "investigation_status",
+      "schema": "public",
+      "values": [
+        "OPEN",
+        "IN_PROGRESS",
+        "CLOSED",
+        "ARCHIVED"
+      ]
+    },
+    "public.operation_type": {
+      "name": "operation_type",
+      "schema": "public",
+      "values": [
+        "ACQUISITION",
+        "RECOVERY",
+        "EXAMINATION",
+        "SANITIZATION",
+        "EXPORT",
+        "OTHER"
+      ]
+    },
+    "public.storage_class": {
+      "name": "storage_class",
+      "schema": "public",
+      "values": [
+        "FORENSIC_IMAGE",
+        "WORKING_COPY",
+        "RECOVERED_EVIDENCE",
+        "CERTIFICATE"
+      ]
+    },
+    "public.storage_status": {
+      "name": "storage_status",
+      "schema": "public",
+      "values": [
+        "UPLOADING",
+        "AVAILABLE",
+        "MISSING",
+        "DELETED"
+      ]
+    },
+    "public.user_role": {
+      "name": "user_role",
+      "schema": "public",
+      "values": [
+        "ADMIN",
+        "INVESTIGATOR"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
