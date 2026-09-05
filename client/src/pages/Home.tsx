@@ -50,9 +50,11 @@ export default function Home() {
   const notify = (message: string) => window.alert(message);
 
   const page = useMemo(() => {
+    const recoveryResultsMatch = location.match(/^\/investigations\/([^/]+)\/(?:recoveries|recovery-jobs)\/([^/]+)\/results$/);
     if (location === "/" || location === "/dashboard") return <Dashboard go={go} acq={acq} recovery={recovery} validation={validation} signed={signed} ledger={ledger} />;
     if (location === "/acquisition") return <Acquisition acq={acq} start={() => setAcq(1)} />;
     if (location === "/recovery") return <Recovery recovery={recovery} start={() => setRecovery(1)} go={go} />;
+    if (recoveryResultsMatch) return <RecoveryResults investigationId={recoveryResultsMatch[1]} recoveryJobId={recoveryResultsMatch[2]} go={go} />;
     if (location.startsWith("/evidence")) return <EvidenceDetail fragment={fragment} setFragment={setFragment} go={go} />;
     if (location === "/validation") return <Validation validation={validation} run={() => setValidation(true)} go={go} />;
     if (location === "/certificate") return <Certificate signed={signed} sign={() => setSigned(true)} ledger={() => { setLedger(true); go("/ledger"); }} />;
@@ -80,7 +82,34 @@ function EvidenceTable({ go }: any) { return <div className="table-wrap"><table>
 
 function Acquisition({ acq, start }: any) { const done = acq === 100; return <><SectionTitle eyebrow="EVIDENCE INTAKE / 01" title="Forensic Acquisition" description="Create a verified working copy without modifying the seized source device." action={<Status tone={acq ? "amber" : "success"}>{done ? "IMAGE VERIFIED" : "DEVICE CONNECTED"}</Status>} /><div className="two-col"><Card><div className="card-head"><div><div className="eyebrow">SOURCE DEVICE</div><h2>DRIVE-001</h2></div><HardDrive size={21} className="muted-icon" /></div><div className="device-visual"><div className="drive-orb"><HardDrive size={34} /></div><div><div className="device-name">1 TB HDD</div><div className="mono muted">DEMO-7A91F2</div></div><Status tone="success">CONNECTED</Status></div><div className="metadata-grid"><div><span>Serial number</span><b className="mono">DEMO-7A91F2</b></div><div><span>Filesystem</span><b>NTFS</b></div><div><span>Sector size</span><b>512 bytes</b></div><div><span>Source state</span><b className="green">Read-only</b></div></div></Card><Card><div className="eyebrow">CREATE FORENSIC IMAGE</div><h2>Acquisition parameters</h2><div className="form-row"><label>Image format<select><option>E01 — Expert Witness Format</option><option>RAW — dd image</option></select></label><label>Destination<div className="input-like mono">/evidence/cases/NTRO-2026-001/</div></label></div>{acq > 0 && <div className="operation"><div className="operation-head"><span>{done ? "Image creation complete" : "Creating forensic image…"}</span><b>{acq}%</b></div><Progress value={acq} color={done ? "teal" : "amber"} /><div className="operation-meta"><span>Blocks processed</span><span className="mono">{done ? "10,201,201" : `${Math.floor(8421391 * acq / 82).toLocaleString()} / 10,201,201`}</span></div></div>}<div className="form-action">{!done ? <Button icon={Play} onClick={start} disabled={acq > 0}>Start acquisition</Button> : <Button variant="success" icon={BadgeCheck}>Generate acquisition certificate</Button>}</div>{done && <div className="verification-box"><div><Check size={15} /> IMAGE CREATED</div><div className="hash-row"><span>Source SHA-256 <b className="mono">{monoHash}</b></span><span>Image SHA-256 <b className="mono">{monoHash}</b></span></div><Status tone="success">HASH VERIFIED · FORENSIC COPY VERIFIED</Status></div>}</Card></div></>; }
 
-function Recovery({ recovery, start, go }: any) { const done = recovery === 100; return <><SectionTitle eyebrow="EVIDENCE PROCESSING / 02" title="Advanced File Recovery" description="Analyze the forensic image using reconstruction methods and recorded provenance." action={<Status tone={done ? "success" : "amber"}>{done ? "RECOVERY COMPLETE" : "READY FOR ANALYSIS"}</Status>} /><Card className="recovery-console"><div className="console-top"><div><div className="eyebrow">SOURCE IMAGE</div><h2>IMG-001 <span className="mono">/ E01</span></h2></div><div className="console-meta"><span>DRIVE-001</span><span>SHA-256 MATCH</span><Button icon={Play} onClick={start} disabled={recovery > 0}>Start recovery</Button></div></div>{recovery > 0 && <div className="scan-progress"><div className="operation-head"><span>{done ? "Recovery scan complete" : "Scanning forensic image…"}</span><b>{recovery}%</b></div><Progress value={recovery} /><div className="scan-stats"><div><span>Sectors scanned</span><b>{done ? "10,201,201" : "8,421,391"}</b></div><div><span>Deleted artifacts</span><b>327</b></div><div><span>Recovered</span><b className="green">214</b></div><div><span>Partial</span><b className="amber-text">61</b></div><div><span>Unrecoverable</span><b className="red-text">52</b></div></div></div>}</Card><div className="filter-row"><div className="eyebrow">RECOVERED ARTIFACTS <span className="count">327 TOTAL</span></div><div className="filters"><button className="filter active">All</button><button className="filter">Complete</button><button className="filter">Partial</button><button className="filter">Corrupted</button><button className="filter">Images</button><button className="filter">Videos</button><button className="filter">Documents</button></div></div><Card className="evidence-card"><EvidenceTable go={go} /></Card></>; }
+function Recovery({ recovery, start, go }: any) { const done = recovery === 100; return <><SectionTitle eyebrow="EVIDENCE PROCESSING / 02" title="Advanced File Recovery" description="Analyze the forensic image using reconstruction methods and recorded provenance." action={<Status tone={done ? "success" : "amber"}>{done ? "RECOVERY COMPLETE" : "READY FOR ANALYSIS"}</Status>} /><Card className="recovery-console"><div className="console-top"><div><div className="eyebrow">SOURCE IMAGE</div><h2>IMG-001 <span className="mono">/ E01</span></h2></div><div className="console-meta"><span>DRIVE-001</span><span>SHA-256 MATCH</span><Button icon={Play} onClick={start} disabled={recovery > 0}>Start recovery</Button></div></div>{recovery > 0 && <div className="scan-progress"><div className="operation-head"><span>{done ? "Recovery scan complete" : "Scanning forensic image…"}</span><b>{recovery}%</b></div><Progress value={recovery} /><div className="scan-stats"><div><span>Sectors scanned</span><b>{done ? "10,201,201" : "8,421,391"}</b></div><div><span>Deleted artifacts</span><b>327</b></div><div><span>Recovered</span><b className="green">214</b></div><div><span>Partial</span><b className="amber-text">61</b></div><div><span>Unrecoverable</span><b className="red-text">52</b></div></div></div>}</Card><div className="filter-row"><div className="eyebrow">RECOVERED ARTIFACTS <span className="count">327 TOTAL</span></div><div className="filters"><button className="filter active">All</button><button className="filter">Complete</button><button className="filter">Partial</button><button className="filter">Corrupted</button><button className="filter">Images</button><button className="filter">Videos</button><button className="filter">Documents</button></div></div><div className="case-actions"><Button icon={ArrowRight} onClick={() => go("/investigations/11111111-1111-4111-8111-111111111111/recovery-jobs/22222222-2222-4222-8222-222222222222/results")}>Review recovery results</Button></div><Card className="evidence-card"><EvidenceTable go={go} /></Card></>; }
+
+function RecoveryResults({ investigationId, recoveryJobId, go }: any) {
+  return <>
+    <SectionTitle eyebrow="RESULTS / PENDING VALIDATION" title="Recovery Results — Pending Validation" description="Candidate artifacts recovered from the working copy are displayed here for review. They are not validated evidence." action={<Status tone="amber">PENDING VALIDATION</Status>} />
+    <div className="two-col">
+      <Card>
+        <div className="card-head">
+          <div><div className="eyebrow">RECOVERY JOB</div><h2>{recoveryJobId}</h2></div>
+          <FileSearch size={20} className="muted-icon" />
+        </div>
+        <div className="info-grid" style={{ marginTop: "1rem" }}>
+          <InfoPanel title="JOB" icon={Database} rows={[["Case", investigationId], ["Source", "Working copy only"], ["Status", "PENDING_VALIDATION"], ["Evidence class", "CANDIDATE_ARTIFACTS"]]} />
+          <InfoPanel title="NOTICE" icon={CircleAlert} rows={[["Validation", "Not yet performed"], ["Authority", "Not final evidence"], ["Policy", "Work product only"]]} />
+        </div>
+      </Card>
+      <Card>
+        <div className="eyebrow">CANDIDATE ARTIFACTS</div>
+        <div className="empty-state" style={{ padding: "1.5rem 0" }}>
+          <Boxes size={32} className="muted-icon" />
+          <h3>No candidate artifacts available</h3>
+          <p>The recovery worker has not produced reviewable artifacts for this job, or the environment has no forensic recovery executables installed. Results remain pending validation and are not evidence.</p>
+          <Button icon={ArrowRight} onClick={() => go("/recovery")}>Back to recovery</Button>
+        </div>
+      </Card>
+    </div>
+  </>;
+}
 
 function EvidenceDetail({ fragment, setFragment, go }: any) { return <><SectionTitle eyebrow="EVIDENCE RECORD / EV-002" title="Evidence detail" description="Fragmented artifact with a complete, inspectable recovery provenance trail." action={<Button variant="ghost" icon={ArrowRight} onClick={() => go("/validation")}>Run validation</Button>} /><div className="detail-header"><div className="detail-file"><div className="large-file-icon video"><FileSearch size={22} /></div><div><div className="eyebrow">EV-002 · VIDEO ARTIFACT</div><h2>deleted_video.mp4</h2><div className="mono muted">RECOVERED FROM IMG-001 / SECTORS 18291–29401</div></div></div><Status tone="amber">PENDING VALIDATION</Status></div><div className="info-grid"><InfoPanel title="FILE" icon={FileText} rows={[["File type", "MP4"], ["Size", "24.6 MB"], ["SHA-256", monoHash]]} /><InfoPanel title="RECOVERY" icon={RefreshCw} rows={[["Method", "Fragment Reconstruction"], ["Fragments", "7"], ["Recovery completeness", "91%"], ["Recovery confidence", "91%"]]} /><InfoPanel title="SOURCE" icon={HardDrive} rows={[["Forensic image", "IMG-001"], ["Device", "DRIVE-001"], ["Source sectors", "18291 – 29401"]]} /></div><Card className="provenance-card"><div className="card-head"><div><div className="eyebrow">RECOVERY PROVENANCE</div><h2>Fragment reconstruction map</h2></div><Status tone="success">7 / 7 FRAGMENTS INDEXED</Status></div><div className="fragment-map"><div className="map-label">SOURCE IMAGE</div><div className="sector-bar">{Array.from({ length: 32 }, (_, i) => <span key={i} className={[0,1,2,6,7,8,12,13,14,15,16,17,18,21,22,23,24,25,26,27,30,31].includes(i) ? "used" : ""} />)}</div><div className="fragment-names">{["F1", "F2", "F3", "F4"].map((f, i) => <button key={f} onClick={() => setFragment(f)} style={{ marginLeft: `${i * 12 + 8}%` }}>{f}<small>↓</small></button>)}</div><div className="reconstruction"><div className="recon-line" />{["F1", "F2", "F3", "F4", "F5", "F6", "F7"].map(f => <button key={f} onClick={() => setFragment(f)} className="fragment-node"><span>{f}</span><small>VALID</small></button>)}</div><div className="reconstructed-file"><Check size={14} /> RECONSTRUCTED FILE <b>deleted_video.mp4</b></div></div></Card></>; }
 function InfoPanel({ title, icon: Icon, rows }: any) { return <Card className="info-panel"><div className="panel-title"><Icon size={15} /><span>{title}</span></div>{rows.map(([k, v]: string[]) => <div className="info-row" key={k}><span>{k}</span><b className={v.includes("SHA") || v.includes("–") ? "mono" : ""}>{v}</b></div>)}</Card>; }
@@ -99,6 +128,90 @@ function Integrity({ tampered, toggle }: any) { return <><SectionTitle eyebrow="
 function Sanitization({ progress, start, go }: any) { const done = progress === 100; return <><SectionTitle eyebrow="DATA LIFECYCLE / DESTRUCTION" title="Secure Data Sanitization" description="Controlled destruction workflow for data that must be securely removed after evidence handling." action={<Status tone={done ? "success" : "amber"}>{done ? "SANITIZATION COMPLETE" : "DEVICE READY"}</Status>} /><div className="two-col"><Card><div className="card-head"><div><div className="eyebrow">TARGET DEVICE</div><h2>DRIVE-001</h2></div><Eraser size={21} className="muted-icon" /></div><div className="device-visual"><div className="drive-orb amber"><Eraser size={34} /></div><div><div className="device-name">1 TB HDD</div><div className="mono muted">DEMO-7A91F2</div></div><Status tone="amber">READY</Status></div><div className="metadata-grid"><div><span>Storage type</span><b>HDD</b></div><div><span>Source case</span><b className="mono">NTRO-2026-001</b></div><div><span>Data scope</span><b>Target artifacts</b></div><div><span>Operator</span><b>ADMIN-001</b></div></div></Card><Card><div className="eyebrow">SANITIZATION METHOD</div><h2>Choose destruction profile</h2><label className="select-label">Method<select><option>NIST 800-88 Clear — single pass</option><option>DoD 5220.22-M — three pass</option><option>Custom laboratory profile</option></select></label>{progress > 0 && <div className="operation"><div className="operation-head"><span>{done ? "Sanitization complete" : "Sanitization in progress…"}</span><b>{progress}%</b></div><Progress value={progress} color={done ? "teal" : "amber"} /><div className="operation-meta"><span>Blocks processed</span><span className="mono">{done ? "10,201,201" : "8,421,391"}</span></div></div>}<div className="form-action">{!done ? <Button variant="danger" icon={Eraser} onClick={start} disabled={progress > 0}>Start sanitization</Button> : <Button variant="success" icon={ArrowRight} onClick={() => go("/verification")}>Post-erasure verification</Button>}</div></Card></div></>; }
 function Verification({ failed, fail, restore, go }: any) { return <><SectionTitle eyebrow="DATA LIFECYCLE / INDEPENDENT TEST" title="Independent Erasure Verification" description="Run a separate recovery test against the sanitized target device." action={<Status tone={failed ? "red" : "success"}>{failed ? "TEST FAILED" : "TEST PASSED"}</Status>} /><Card className={`verification-card ${failed ? "danger" : ""}`}><div className="verification-graphic"><div className={`verify-ring ${failed ? "failed" : ""}`}>{failed ? <AlertTriangle size={34} /> : <ShieldCheck size={34} />}</div><div><div className="eyebrow">POST-ERASURE RECOVERY TEST</div><h2>{failed ? "Sanitization verification failed" : "Sanitization verified"}</h2><p>{failed ? "Recoverable artifacts were found during the independent test." : "No target data was recovered during the post-erasure verification test."}</p></div></div><div className="verification-stats"><div><span>Target artifacts</span><b>{failed ? "7" : "0"}</b></div><div><span>Recoverable target data</span><b>{failed ? "7" : "0"}</b></div><div><span>Verification</span><b className={failed ? "red-text" : "green"}>{failed ? "FAILED" : "PASSED"}</b></div></div><div className="verification-actions">{failed ? <><Button icon={RotateCcw} onClick={restore}>Restore test state</Button><Button variant="danger" onClick={() => window.alert("Repeat sanitization procedure queued in demo.")}>Repeat sanitization procedure</Button></> : <><Button variant="success" icon={BadgeCheck} onClick={() => go("/erasure-certificate")}>Generate erasure certificate</Button><Button variant="ghost" icon={AlertTriangle} onClick={fail}>Simulate erasure failure</Button></>}</div></Card></>; }
 function ErasureCertificate({ signed, sign, record }: any) { return <><SectionTitle eyebrow="DATA LIFECYCLE / CERTIFICATION" title="Secure Data Erasure Certificate" description="A signed completion record for the sanitization and independent recovery test." action={<Status tone={signed ? "success" : "amber"}>{signed ? "SIGNED" : "DRAFT PREVIEW"}</Status>} /><Card className="certificate erasure-cert"><div className="certificate-top"><div className="seal amber-seal"><Eraser size={28} /></div><div><div className="certificate-kicker">NATIONAL TECHNICAL RESEARCH ORGANISATION</div><h2>SECURE DATA ERASURE CERTIFICATE</h2><div className="mono muted">ERASURE-NTRO-2026-0003</div></div><div className="cert-status"><Status tone="success">VERIFICATION PASSED</Status></div></div><div className="cert-grid">{[["Device", "DRIVE-001"], ["Sanitization method", "NIST 800-88 Clear"], ["Operator", "ADMIN-001"], ["Start time", "2026-09-01 12:41:02"], ["End time", "2026-09-01 12:48:29"], ["Post-erasure recovery test", "PASSED"], ["Recoverable target data", "0"], ["Status", "SANITIZATION VERIFIED"], ["Certificate hash", "ER-88A1...2D90"]].map(([k,v]) => <div key={k}><span>{k}</span><b className={k.includes("hash") ? "mono" : k === "Status" ? "green" : ""}>{v}</b></div>)}</div><div className="cert-actions"><Button icon={signed ? Download : PenLine} onClick={signed ? () => window.alert("Erasure certificate export simulated.") : sign}>{signed ? "Export" : "Sign certificate"}</Button><Button variant="success" icon={Link2} onClick={record}>Record to ledger</Button></div></Card></>; }
-function Cases({ go }: any) { return <><SectionTitle eyebrow="CASE MANAGEMENT" title="Case registry" description="Active investigations and evidence-processing workspaces." action={<Button icon={FolderKanban} onClick={() => window.alert("New case creation is a demo placeholder.")}>New case</Button>} /><Card><div className="registry-row active"><div className="case-id-mark"><FolderKanban size={18} /></div><div className="registry-main"><b>NTRO-2026-001</b><span>Operation Glasshouse · 1 device · 4 evidence artifacts</span></div><Status tone="success">ACTIVE</Status><span className="mono muted">UPDATED 12:18</span><Button variant="ghost" icon={ArrowRight} onClick={() => go("/")}>Open</Button></div>{["NTRO-2026-002", "NTRO-2026-003"].map(id => <div className="registry-row" key={id}><div className="case-id-mark muted-box"><FolderKanban size={18} /></div><div className="registry-main"><b>{id}</b><span>Closed investigation · evidence archived</span></div><Status>ARCHIVED</Status><span className="mono muted">2026-08-14</span><Button variant="ghost" onClick={() => window.alert("Archived case is view-only in this demo.")}>View</Button></div>)}</Card></>; }
+function Cases({ go }: any) {
+  const [me, setMe] = useState<any | null>(null);
+  useEffect(() => { void (async () => { try { const r = await fetch('/api/auth/me'); if (r.ok) setMe(await r.json().then((b) => b.user)); } catch {} })(); }, []);
+  return <><SectionTitle eyebrow="CASE MANAGEMENT" title="Case registry" description="Active investigations and evidence-processing workspaces." action={<Button icon={FolderKanban} onClick={() => window.alert("New case creation is a demo placeholder.")}>New case</Button>} /><Card><div className="registry-row active"><div className="case-id-mark"><FolderKanban size={18} /></div><div className="registry-main"><b>NTRO-2026-001</b><span>Operation Glasshouse · 1 device · 4 evidence artifacts</span></div><Status tone="success">ACTIVE</Status><span className="mono muted">UPDATED 12:18</span><Button variant="ghost" icon={ArrowRight} onClick={() => go("/")}>Open</Button></div>{["NTRO-2026-002", "NTRO-2026-003"].map(id => <div className="registry-row" key={id}><div className="case-id-mark muted-box"><FolderKanban size={18} /></div><div className="registry-main"><b>{id}</b><span>Closed investigation · evidence archived</span></div><Status>ARCHIVED</Status><span className="mono muted">2026-08-14</span><Button variant="ghost" onClick={() => window.alert("Archived case is view-only in this demo.")}>View</Button></div>)}</Card>
+  {me && me.role === 'ADMIN' && <WorkflowEditor investigationId="11111111-1111-4111-8111-111111111111" />}
+  </>;
+}
+function WorkflowEditor({ investigationId }: { investigationId: string }) {
+  const [investigators, setInvestigators] = useState<{ id: string; name: string }[]>([]);
+  const [workflow, setWorkflow] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const usersRes = await fetch(`/api/admin/users`);
+        if (usersRes.ok) {
+          const body = await usersRes.json();
+          setInvestigators(body.users ?? []);
+        }
+        const wfRes = await fetch(`/api/investigations/${investigationId}/workflow`);
+        if (wfRes.ok) setWorkflow(await wfRes.json().then((r) => r.workflow));
+      } catch (e) {
+        // ignore; demo UI
+      }
+    })();
+  }, [investigationId]);
+
+  async function save() {
+    if (!workflow) return;
+    setLoading(true);
+    try {
+      const body = {
+        acquisitionInvestigatorId: workflow.acquisitionInvestigatorId,
+        recoveryInvestigatorId: workflow.recoveryInvestigatorId,
+        validationInvestigatorId: workflow.validationInvestigatorId,
+        analysisInvestigatorId: workflow.analysisInvestigatorId,
+      };
+      const res = await fetch(`/api/investigations/${investigationId}/workflow`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      if (!res.ok) throw new Error("Save failed");
+      const data = await res.json();
+      setWorkflow(data.workflow);
+      window.alert("Workflow saved");
+    } catch (err) {
+      window.alert("Failed to save workflow: " + String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function labelById(id?: string | null) {
+    const found = investigators.find((u) => u.id === id);
+    return found ? found.name : "—";
+  }
+
+  return <Card>
+    <div className="card-head"><div><div className="eyebrow">FORENSIC WORKFLOW</div><h2>Investigation workflow</h2></div></div>
+    <div style={{ display: "grid", gap: "0.5rem" }}>
+      <label>Acquisition</label>
+      <select value={workflow?.acquisitionInvestigatorId ?? ""} onChange={(e) => setWorkflow({ ...workflow, acquisitionInvestigatorId: e.target.value })}>
+        <option value="">Select investigator</option>
+        {investigators.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+      </select>
+      <label>Recovery</label>
+      <select value={workflow?.recoveryInvestigatorId ?? ""} onChange={(e) => setWorkflow({ ...workflow, recoveryInvestigatorId: e.target.value })}>
+        <option value="">Select investigator</option>
+        {investigators.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+      </select>
+      <label>Validation</label>
+      <select value={workflow?.validationInvestigatorId ?? ""} onChange={(e) => setWorkflow({ ...workflow, validationInvestigatorId: e.target.value })}>
+        <option value="">Select investigator</option>
+        {investigators.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+      </select>
+      <label>Analysis</label>
+      <select value={workflow?.analysisInvestigatorId ?? ""} onChange={(e) => setWorkflow({ ...workflow, analysisInvestigatorId: e.target.value })}>
+        <option value="">Select investigator</option>
+        {investigators.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+      </select>
+      <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+        <Button variant="primary" onClick={save} disabled={loading}>Save Workflow</Button>
+        {workflow && <div style={{ marginLeft: "1rem" }}>{labelById(workflow.acquisitionInvestigatorId)} → {labelById(workflow.recoveryInvestigatorId)} → {labelById(workflow.validationInvestigatorId)} → {labelById(workflow.analysisInvestigatorId)}</div>}
+      </div>
+    </div>
+  </Card>;
+}
 function Reports() { return <><SectionTitle eyebrow="CASE OUTPUT" title="Reports & exports" description="Generate presentation-ready records from the current fictional case." action={<Button icon={Download} onClick={() => window.alert("Final case report generated in demo mode.")}>Generate final case report</Button>} /><div className="report-grid"><Card className="report-hero"><div className="report-kicker">NTRO-2026-001</div><h2>Forensic Investigation Report</h2><p>Integrated evidence recovery, validation, custody and sanitization summary.</p><div className="report-progress"><span>CASE COMPLETION</span><b>74%</b><Progress value={74} /></div></Card><Card><div className="eyebrow">RECOVERY SUMMARY</div><div className="report-stats"><b>214 <small>recovered</small></b><b>61 <small>partial</small></b><b>52 <small>unrecoverable</small></b></div><div className="report-row"><span>Evidence summary</span><b>327 artifacts</b></div><div className="report-row"><span>Chain of custody</span><b>19 events</b></div><div className="report-row"><span>Integrity</span><b className="green">100% verified</b></div><div className="report-row"><span>Erasure certificates</span><b>3</b></div></Card></div></>; }
 function SettingsPage() { return <><SectionTitle eyebrow="SYSTEM CONFIGURATION" title="Settings" description="Read-only environment details for the SIH demonstration workstation." /><Card><div className="settings-list">{[["Environment", "FRX-DEMO / LOCAL SESSION"], ["Operator identity", "INV-001 · Forensic Investigator"], ["Ledger mode", "Permissioned mock ledger"], ["Hash algorithm", "SHA-256 · simulated"], ["Data retention", "Session-only mock state"]].map(([k,v]) => <div key={k}><div><span>{k}</span><b>{v}</b></div><Settings2 size={16} /></div>)}</div></Card></>; }

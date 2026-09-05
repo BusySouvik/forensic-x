@@ -4,7 +4,7 @@ import type { Readable } from "node:stream";
 import type { DeletionPolicy, StorageClass, StorageObjectPublic, StorageStatus } from "../../shared/types";
 import { env } from "../config/env";
 import { getDb } from "../db";
-import { storageObjects, type StorageObjectRow } from "../db/schema";
+import { evidenceRecords, storageObjects, type StorageObjectRow } from "../db/schema";
 import { HttpError } from "../middleware/httpError";
 import { generateObjectKey } from "../storage/objectKey";
 import { getMinioObjectStore } from "../storage/minio";
@@ -273,4 +273,10 @@ export function getEvidenceStorageService() {
 
 export function createEvidenceStorageService(store: ObjectStore, references: StorageReferenceStore) {
   return new EvidenceStorageService(store, references);
+}
+
+export async function getMasterEvidenceById(id: string) {
+  const db = getDb();
+  const [row] = await db.select().from(evidenceRecords).where(eq(evidenceRecords.id, id)).limit(1);
+  return row ?? null;
 }
