@@ -27,7 +27,9 @@ const envSchema = z.object({
   FORENSIC_ACQUISITION_ENGINE: z.preprocess(emptyToUndefined, z.enum(["ewfacquire", "test-file"]).optional()),
   FORENSIC_ACQUISITION_EXECUTABLE: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   FORENSIC_ACQUISITION_STAGING_ROOT: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  FORENSIC_X_WORKER_ID: z.preprocess(emptyToUndefined, z.string().uuid().optional()),
   FORENSIC_X_ENABLE_TEST_FIXTURE_INGESTION: z.preprocess(emptyToUndefined, z.enum(["true"]).optional()),
+  FORENSIC_X_ALLOW_TEST_SANITIZATION: z.preprocess(emptyToUndefined, z.enum(["0", "1"]).optional()),
 });
 
 function readEnv() {
@@ -50,7 +52,9 @@ function readEnv() {
     FORENSIC_ACQUISITION_ENGINE: values.FORENSIC_ACQUISITION_ENGINE ?? "test-file",
     FORENSIC_ACQUISITION_EXECUTABLE: values.FORENSIC_ACQUISITION_EXECUTABLE,
     FORENSIC_ACQUISITION_STAGING_ROOT: values.FORENSIC_ACQUISITION_STAGING_ROOT,
+    FORENSIC_X_WORKER_ID: values.FORENSIC_X_WORKER_ID,
     FORENSIC_X_ENABLE_TEST_FIXTURE_INGESTION: values.FORENSIC_X_ENABLE_TEST_FIXTURE_INGESTION,
+    FORENSIC_X_ALLOW_TEST_SANITIZATION: values.FORENSIC_X_ALLOW_TEST_SANITIZATION,
   };
 }
 

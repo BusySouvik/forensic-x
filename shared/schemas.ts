@@ -9,6 +9,7 @@ import {
   OPERATION_TYPES,
   RECOVERY_ENGINES,
   RECOVERY_METHODS,
+  SANITIZATION_METHODS,
   USER_ROLES,
 } from "./types";
 
@@ -30,6 +31,23 @@ export const createUserSchema = z.object({
   password: z.string().min(8),
   name: z.string().min(1).max(120),
   role: z.enum(USER_ROLES),
+});
+
+export const createInvestigatorSchema = z.object({
+  name: z.string().min(1).max(120),
+  email: z.email(),
+  password: z.string().min(8),
+  investigatorId: z.string().trim().min(1).max(64),
+  contactNumber: z.string().trim().min(1).max(40),
+  designation: z.string().trim().min(1).max(120),
+  department: z.string().trim().min(1).max(120),
+  specialization: z.string().trim().max(160).optional().nullable(),
+  joiningDate: z.iso.datetime().optional().nullable(),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
 });
 
 export const createInvestigationSchema = z.object({
@@ -120,5 +138,15 @@ export const recoveryJobIdParamSchema = z.object({
 });
 
 export const createRecoveryCertificateSchema = z.object({});
+
+export const createSanitizationJobSchema = z.object({
+  investigationId: uuidSchema,
+  authorizationId: uuidSchema,
+  targetType: z.enum(["FOLDER", "DEVICE", "EVIDENCE", "STORAGE_OBJECT"]),
+  targetReference: z.string().min(1).max(2048),
+  targetStableIdentifier: z.string().max(2048).optional().nullable(),
+  storageType: z.string().max(255).optional().nullable(),
+  sanitizationMethod: z.enum(SANITIZATION_METHODS),
+});
 
 export const validateCertificateSchema = z.object({});

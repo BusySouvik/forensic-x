@@ -76,6 +76,25 @@ export type RecoveryEngine = (typeof RECOVERY_ENGINES)[number];
 export const RECOVERY_JOB_STATUSES = ["QUEUED", "VALIDATING", "RECOVERING", "COLLECTING", "COMPLETED", "FAILED", "CANCELLED"] as const;
 export type RecoveryJobStatus = (typeof RECOVERY_JOB_STATUSES)[number];
 
+export const SANITIZATION_METHODS = ["HDD_OVERWRITE", "SSD_SECURE_ERASE", "TEST_TRUNCATE"] as const;
+export type SanitizationMethod = (typeof SANITIZATION_METHODS)[number];
+
+export const SANITIZATION_JOB_STATUSES = [
+  "QUEUED",
+  "AUTHORIZED",
+  "SANITIZING",
+  "VERIFYING",
+  "CERTIFICATE_READY",
+  "COMPLETED",
+  "CANCELLED",
+  "SANITIZATION_FAILED",
+  "VERIFICATION_FAILED",
+  "CERTIFICATE_FAILED",
+  "UNSUPPORTED_METHOD",
+  "TARGET_MISMATCH",
+] as const;
+export type SanitizationJobStatus = (typeof SANITIZATION_JOB_STATUSES)[number];
+
 export const AUDIT_EVENT_TYPES = ["REQUESTED", "AUTHORIZED", "STARTED", "COMPLETED", "FAILED", "CANCELLED"] as const;
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
 

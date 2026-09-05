@@ -84,6 +84,21 @@ export const recoveryJobStatusEnum = pgEnum("recovery_job_status", [
 ]);
 
 export const candidateStatusEnum = pgEnum("candidate_status", ["PENDING", "COLLECTED", "FAILED"]);
+export const sanitizationMethodEnum = pgEnum("sanitization_method", ["HDD_OVERWRITE", "SSD_SECURE_ERASE", "TEST_TRUNCATE"]);
+export const sanitizationJobStatusEnum = pgEnum("sanitization_job_status", [
+  "QUEUED",
+  "AUTHORIZED",
+  "SANITIZING",
+  "VERIFYING",
+  "CERTIFICATE_READY",
+  "COMPLETED",
+  "CANCELLED",
+  "SANITIZATION_FAILED",
+  "VERIFICATION_FAILED",
+  "UNSUPPORTED_METHOD",
+  "TARGET_MISMATCH",
+  "CERTIFICATE_FAILED",
+]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -94,6 +109,24 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [uniqueIndex("users_email_unique").on(table.email)]);
+
+/** Professional identity for an investigator.  Kept separate from the account so
+ * forensic references continue to point at the stable users record. */
+export const investigatorProfiles = pgTable("investigator_profiles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  investigatorId: text("investigator_id").notNull(),
+  contactNumber: text("contact_number"),
+  designation: text("designation").notNull(),
+  department: text("department").notNull(),
+  specialization: text("specialization"),
+  joiningDate: timestamp("joining_date", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("investigator_profiles_user_unique").on(table.userId),
+  uniqueIndex("investigator_profiles_investigator_id_unique").on(table.investigatorId),
+]);
 
 export const investigations = pgTable("investigations", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -251,6 +284,51 @@ export const recoveryCertificates = pgTable("recovery_certificates", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const sanitization_certificates = pgTable("sanitization_certificates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  investigationId: uuid("investigation_id").notNull().references(() => investigations.id, { onDelete: "cascade" }),
+  sanitizationJobId: uuid("sanitization_job_id").notNull().references(() => sanitization_jobs.id, { onDelete: "cascade" }),
+  authorizationId: uuid("authorization_id").notNull().references(() => operationAuthorizations.id, { onDelete: "restrict" }),
+  targetType: text("target_type").notNull(),
+  targetReference: text("target_reference").notNull(),
+  targetStableIdentifier: text("target_stable_identifier"),
+  storageMetadata: jsonb("storage_metadata").notNull().default({}),
+  sanitizationMethod: sanitizationMethodEnum("sanitization_method").notNull(),
+  bytesAffected: bigint("bytes_affected", { mode: "number" }),
+  verificationResult: text("verification_result"),
+  verificationDetails: jsonb("verification_details").notNull().default({}),
+  performerId: uuid("performer_id").references(() => users.id, { onDelete: "set null" }),
+  payload: jsonb("payload").notNull().default({}),
+  payloadHash: text("payload_hash"),
+  signature: text("signature"),
+  signerId: uuid("signer_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const sanitization_jobs = pgTable("sanitization_jobs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  investigationId: uuid("investigation_id").notNull().references(() => investigations.id, { onDelete: "cascade" }),
+  authorizationId: uuid("authorization_id").notNull().references(() => operationAuthorizations.id, { onDelete: "restrict" }),
+  requestedBy: uuid("requested_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  targetType: text("target_type").notNull(),
+  targetReference: text("target_reference").notNull(),
+  targetStableIdentifier: text("target_stable_identifier"),
+  storageType: text("storage_type"),
+  sanitizationMethod: sanitizationMethodEnum("sanitization_method").notNull(),
+  status: sanitizationJobStatusEnum("status").notNull().default("QUEUED"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  bytesAffected: bigint("bytes_affected", { mode: "number" }),
+  verificationStatus: text("verification_status"),
+  verificationHash: text("verification_hash"),
+  verificationDetails: jsonb("verification_details").notNull().default({}),
+  failureReason: text("failure_reason"),
+  certificateId: uuid("certificate_id"),
+  performerId: uuid("performer_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const ledgerEventStatusEnum = pgEnum("ledger_event_status", ["PENDING", "SUBMITTED", "CONFIRMED", "FAILED", "UNAVAILABLE"]);
 
 export const ledger_events = pgTable("ledger_events", {
@@ -258,6 +336,7 @@ export const ledger_events = pgTable("ledger_events", {
   investigationId: uuid("investigation_id").notNull().references(() => investigations.id, { onDelete: "cascade" }),
   evidenceId: uuid("evidence_id").notNull().references(() => evidenceRecords.id, { onDelete: "cascade" }),
   acquisitionJobId: uuid("acquisition_job_id").notNull().references(() => acquisitionJobs.id, { onDelete: "cascade" }),
+  sanitizationJobId: uuid("sanitization_job_id").references(() => sanitization_jobs.id, { onDelete: "set null" }),
   event_type: text("event_type").notNull(),
   event_hash: text("event_hash").notNull(),
   payload: jsonb("payload").notNull().default({}),
@@ -268,7 +347,7 @@ export const ledger_events = pgTable("ledger_events", {
   status: ledgerEventStatusEnum("status").notNull().default("PENDING"),
   anchored_at: timestamp("anchored_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("ledger_events_acq_unique").on(table.acquisitionJobId)]);
+}, (table) => [uniqueIndex("ledger_events_acq_unique").on(table.acquisitionJobId), uniqueIndex("ledger_events_sanitization_unique").on(table.sanitizationJobId)]);
 
 export const recoveryJobs = pgTable("recovery_jobs", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -500,6 +579,8 @@ export type StorageObjectRow = typeof storageObjects.$inferSelect;
 export type AcquisitionJobRow = typeof acquisitionJobs.$inferSelect;
 export type EvidenceRecordRow = typeof evidenceRecords.$inferSelect;
 export type WorkingCopyRow = typeof workingCopies.$inferSelect;
+export type SanitizationJobRow = typeof sanitization_jobs.$inferSelect;
+export type SanitizationCertificateRow = typeof sanitization_certificates.$inferSelect;
 export type AuditEventRow = typeof auditEvents.$inferSelect;
 export type RecoveryCertificateRow = typeof recoveryCertificates.$inferSelect;
 export type LedgerEventRow = typeof ledger_events.$inferSelect;

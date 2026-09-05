@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
 import { getDb } from "../db";
 import { users, investigations, acquisitionJobs, evidenceRecords, operationAuthorizations, storageObjects, auditEvents, devices, workingCopies, recoveryJobs, recoveredCandidates, investigationWorkflows } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { computeEventHash, _internal, recordAcquisitionEvent, getLedgerEventByAcquisition } from "./ledger";
 
-const investigationId = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+let investigationId = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
 const adminId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-const jobId = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
-const authId = "cccccccc-5555-4555-8555-cccccccccccc";
-const storageObjectId = "dddddddd-6666-4666-8666-dddddddddddd";
+let jobId = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
+let authId = "cccccccc-5555-4555-8555-cccccccccccc";
+let storageObjectId = "dddddddd-6666-4666-8666-dddddddddddd";
+let storageObjectKey = "ledger-test";
+let evidenceId = "eeeeeeee-3333-4333-8333-eeeeeeeeeeee";
 
 beforeEach(async () => {
   const db = getDb();
@@ -25,16 +28,23 @@ beforeEach(async () => {
   await db.delete(investigationWorkflows).where(eq(investigationWorkflows.investigationId, investigationId)).returning();
   await db.delete(investigations).where(eq(investigations.id, investigationId)).returning();
 
+  investigationId = randomUUID();
+  jobId = randomUUID();
+  authId = randomUUID();
+  storageObjectId = randomUUID();
+  storageObjectKey = `ledger-test-${storageObjectId}`;
+  evidenceId = randomUUID();
+
   // Insert minimal fixtures required for this test
   const [existingUser] = await db.select().from(users).where(eq(users.id, adminId)).limit(1);
   if (!existingUser) {
     await db.insert(users).values({ id: adminId, email: "a@test", passwordHash: "", name: "Admin", role: "ADMIN" }).returning();
   }
-  await db.insert(investigations).values({ id: investigationId, investigationNumber: "LEDGER-1", title: "Ledger test", description: "", createdBy: adminId }).returning();
+  await db.insert(investigations).values({ id: investigationId, investigationNumber: `LEDGER-${investigationId}`, title: "Ledger test", description: "", createdBy: adminId }).returning();
   await db.insert(operationAuthorizations).values({ id: authId, investigationId, deviceId: null, requestedBy: adminId, approvedBy: null, operationType: "ACQUISITION", reason: "ledger test", status: "APPROVED" }).returning();
-  await db.insert(storageObjects).values({ id: storageObjectId, investigationId, storageClass: "FORENSIC_IMAGE", bucket: "test", objectKey: "ledger-test", originalFilename: "acq.img", contentType: "application/octet-stream", fileSizeBytes: 123, sha256: "msha1" }).returning();
+  await db.insert(storageObjects).values({ id: storageObjectId, investigationId, storageClass: "FORENSIC_IMAGE", bucket: "test", objectKey: storageObjectKey, originalFilename: "acq.img", contentType: "application/octet-stream", fileSizeBytes: 123, sha256: "msha1" }).returning();
   await db.insert(acquisitionJobs).values({ id: jobId, investigationId, deviceId: null, requestedBy: adminId, authorizationId: authId, sourceType: "TEST_FILE", sourceIdentifier: "x", outputStorageObjectId: null, sha256: null, size: null, startedAt: null, completedAt: null, errorMessage: null, createdAt: new Date(), updatedAt: new Date() }).returning();
-  await db.insert(evidenceRecords).values({ id: "eeeeeeee-3333-4333-8333-eeeeeeeeeeee", investigationId, acquisitionJobId: jobId, masterStorageObjectId: storageObjectId, sha256: "msha1", size: 123, status: "AVAILABLE", createdAt: new Date() }).returning();
+  await db.insert(evidenceRecords).values({ id: evidenceId, investigationId, acquisitionJobId: jobId, masterStorageObjectId: storageObjectId, sha256: "msha1", size: 123, status: "AVAILABLE", createdAt: new Date() }).returning();
 });
 
 describe("Ledger service basic tests", () => {
@@ -55,9 +65,9 @@ describe("Ledger service basic tests", () => {
   });
 
   it("recordAcquisitionEvent is idempotent and stores event referencing acquisition", async () => {
-    const ev1 = await recordAcquisitionEvent({ investigationId, evidenceId: "eeeeeeee-3333-4333-8333-eeeeeeeeeeee", acquisitionJobId: jobId, deviceId: null, masterSha256: "msha1", masterSize: 123, actorId: adminId, authorizationId: adminId });
+    const ev1 = await recordAcquisitionEvent({ investigationId, evidenceId, acquisitionJobId: jobId, deviceId: null, masterSha256: "msha1", masterSize: 123, actorId: adminId, authorizationId: adminId });
     expect(ev1).toBeTruthy();
-    const ev2 = await recordAcquisitionEvent({ investigationId, evidenceId: "eeeeeeee-3333-4333-8333-eeeeeeeeeeee", acquisitionJobId: jobId, deviceId: null, masterSha256: "msha1", masterSize: 123, actorId: adminId, authorizationId: adminId });
+    const ev2 = await recordAcquisitionEvent({ investigationId, evidenceId, acquisitionJobId: jobId, deviceId: null, masterSha256: "msha1", masterSize: 123, actorId: adminId, authorizationId: adminId });
     expect(ev2.id).toBe(ev1.id);
     const fetched = await getLedgerEventByAcquisition(jobId);
     expect(fetched).toBeTruthy();
