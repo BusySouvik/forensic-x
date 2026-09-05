@@ -125,3 +125,16 @@ describe("storage API authorization", () => {
     expect(response.body.error).toBe("Insufficient permissions");
   });
 });
+
+describe("recovery results preview API", () => {
+  it("returns a pending-validation empty state for recovery job artifacts", async () => {
+    const response = await request(app)
+      .get("/api/investigations/11111111-1111-4111-8111-111111111111/recovery-jobs/22222222-2222-4222-8222-222222222222/results")
+      .set(authHeader("INVESTIGATOR"));
+
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe("PENDING_VALIDATION");
+    expect(response.body.artifacts).toEqual([]);
+    expect(response.body.message).toContain("pending validation");
+  });
+});

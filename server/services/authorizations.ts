@@ -29,6 +29,12 @@ export async function listAuthorizationsForInvestigation(investigationId: string
   return listAuthorizations({ investigationId });
 }
 
+export async function getAuthorizationById(id: string) {
+  const db = getDb();
+  const [row] = await db.select().from(operationAuthorizations).where(eq(operationAuthorizations.id, id)).limit(1);
+  return row ?? null;
+}
+
 export async function requestAuthorization(input: {
   investigationId: string;
   deviceId?: string | null;

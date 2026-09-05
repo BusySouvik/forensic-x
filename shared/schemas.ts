@@ -1,11 +1,14 @@
 import { z } from "zod";
 import {
+  ACQUISITION_SOURCE_TYPES,
   AUTHORIZATION_STATUSES,
   CONNECTION_TYPES,
   DEVICE_STATUSES,
   DEVICE_TYPES,
   INVESTIGATION_STATUSES,
   OPERATION_TYPES,
+  RECOVERY_ENGINES,
+  RECOVERY_METHODS,
   USER_ROLES,
 } from "./types";
 
@@ -76,7 +79,46 @@ export const investigationIdParamSchema = z.object({
   investigationId: uuidSchema,
 });
 
+export const configureInvestigationWorkflowSchema = z.object({
+  acquisitionInvestigatorId: uuidSchema,
+  recoveryInvestigatorId: uuidSchema,
+  validationInvestigatorId: uuidSchema,
+  analysisInvestigatorId: uuidSchema,
+});
+
 export const storageSampleSchema = z.object({
   investigationId: uuidSchema.optional().nullable(),
   evidenceId: z.string().min(1).max(128).optional().nullable(),
 });
+
+export const createAcquisitionSchema = z.object({
+  investigationId: uuidSchema,
+  deviceId: uuidSchema.optional().nullable(),
+  authorizationId: uuidSchema,
+  sourceType: z.enum(ACQUISITION_SOURCE_TYPES),
+  sourceIdentifier: z.string().min(1).max(2048),
+});
+
+export const acquisitionIdParamSchema = z.object({
+  id: uuidSchema,
+});
+
+export const acquisitionListQuerySchema = z.object({
+  investigationId: uuidSchema.optional().nullable(),
+});
+
+export const createRecoveryJobSchema = z.object({
+  workingCopyId: uuidSchema,
+  authorizationId: uuidSchema,
+  method: z.enum(RECOVERY_METHODS),
+  engine: z.enum(RECOVERY_ENGINES),
+  config: z.record(z.string(), z.any()).optional().default({}),
+});
+
+export const recoveryJobIdParamSchema = z.object({
+  id: uuidSchema,
+});
+
+export const createRecoveryCertificateSchema = z.object({});
+
+export const validateCertificateSchema = z.object({});

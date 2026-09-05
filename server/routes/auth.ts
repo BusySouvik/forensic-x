@@ -3,6 +3,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const";
 import { bootstrapAdminSchema, createUserSchema, loginSchema } from "../../shared/schemas";
 import { env } from "../config/env";
 import { requireAuth, requireRole } from "../middleware/auth";
+import { eq } from "drizzle-orm";
 import { asyncHandler } from "../middleware/errorHandler";
 import { validate } from "../middleware/validate";
 import { bootstrapAdmin, createUserRecord, getUserById, login } from "../services/auth";
@@ -55,5 +56,18 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const user = await createUserRecord(req.body);
     res.status(201).json({ user });
+  }),
+);
+
+authRouter.get(
+  "/admin/users",
+  requireAuth,
+  requireRole("ADMIN"),
+  asyncHandler(async (_req, res) => {
+    const db = await import("../db");
+    const { users } = await import("../db/schema");
+    const { getDb } = await import("../db");
+    const rows = await getDb().select({ id: users.id, name: users.name, role: users.role }).from(users).where(eq(users.role, "INVESTIGATOR"));
+    res.json({ users: rows.map((r: any) => ({ id: r.id, name: r.name })) });
   }),
 );

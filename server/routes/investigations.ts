@@ -3,11 +3,14 @@ import {
   createInvestigationSchema,
   idParamSchema,
   updateInvestigationSchema,
+  configureInvestigationWorkflowSchema,
+  investigationIdParamSchema,
 } from "../../shared/schemas";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler } from "../middleware/errorHandler";
 import { validate } from "../middleware/validate";
 import { createInvestigation, getInvestigation, listInvestigations, updateInvestigation } from "../services/investigations";
+import { configureWorkflow, getWorkflow } from "../services/investigationWorkflow";
 
 export const investigationsRouter = Router();
 
@@ -53,3 +56,12 @@ investigationsRouter.patch(
     res.json({ investigation });
   }),
 );
+
+investigationsRouter.get("/investigations/:investigationId/workflow", requireAuth, validate(investigationIdParamSchema, "params"), asyncHandler(async (req, res) => {
+  res.json({ workflow: await getWorkflow(req.params.investigationId) });
+}));
+
+investigationsRouter.put("/investigations/:investigationId/workflow", requireAuth, requireRole("ADMIN"), validate(investigationIdParamSchema, "params"), validate(configureInvestigationWorkflowSchema), asyncHandler(async (req, res) => {
+  const workflow = await configureWorkflow({ investigationId: req.params.investigationId, actorId: req.user!.sub, ...req.body });
+  res.json({ workflow });
+}));
