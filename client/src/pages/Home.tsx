@@ -361,9 +361,12 @@ function DevicesPage({ snapshot }: { snapshot: BackendSnapshot }) {
 
 function AssignmentPage({ snapshot }: { snapshot: BackendSnapshot }) {
   const selectedCase = selectActiveInvestigation(snapshot.investigations);
-  const workflow = snapshot.workflow;
+  const [workflow, setWorkflow] = useState<Workflow | null>(snapshot.workflow);
   const [assignments, setAssignments] = useState({ acquisitionInvestigatorId: workflow?.acquisitionInvestigatorId || "", recoveryInvestigatorId: workflow?.recoveryInvestigatorId || "", validationInvestigatorId: workflow?.validationInvestigatorId || "", analysisInvestigatorId: workflow?.analysisInvestigatorId || "" });
   const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    setWorkflow(snapshot.workflow);
+  }, [snapshot.workflow]);
   useEffect(() => {
     setAssignments({ acquisitionInvestigatorId: workflow?.acquisitionInvestigatorId || "", recoveryInvestigatorId: workflow?.recoveryInvestigatorId || "", validationInvestigatorId: workflow?.validationInvestigatorId || "", analysisInvestigatorId: workflow?.analysisInvestigatorId || "" });
   }, [workflow]);
@@ -373,9 +376,9 @@ function AssignmentPage({ snapshot }: { snapshot: BackendSnapshot }) {
     if (!selectedCase || Object.values(assignments).some((value) => !value)) return;
     setSaving(true);
     try {
-      await saveWorkflow(selectedCase.id, assignments);
+      const result = await saveWorkflow(selectedCase.id, assignments);
+      setWorkflow(result.workflow);
       toast("Workflow configuration saved by backend.");
-      window.location.reload();
     } catch (error) {
       toast(error instanceof Error ? error.message : "Workflow configuration failed.");
     } finally {
@@ -384,20 +387,20 @@ function AssignmentPage({ snapshot }: { snapshot: BackendSnapshot }) {
   };
   const workflowContent = workflow
     ? <DataTable columns={["STAGE", "ASSIGNED INVESTIGATOR", "VERSION", "UPDATED"]}>{rows.map(([stage, investigator]) => <tr key={stage}><td><span className="stage-chip">{stage}</span></td><td className="mono">{investigator}</td><td>{workflow.version}</td><td className="muted-cell">{formatDate(workflow.updatedAt)}</td></tr>)}</DataTable>
-    : <UnavailableState feature="Workflow assignment" detail={selectedCase ? "No workflow record was returned for the selected investigation." : "The backend returned no investigations to select."} />;
+    : <EmptyState icon={ShieldCheck} title="WORKFLOW NOT CONFIGURED" detail={selectedCase ? "Assign eligible investigators below to create the persisted workflow for this investigation." : "The backend returned no investigations to select."} />;
   return <div className="page-stack">
     <PageHeader eyebrow="WORKFLOW CONTROL / LIVE ASSIGNMENT" title="Task assignment" description="The backend exposes one workflow record per investigation with four assigned stages." actions={selectedCase ? <div className="assignment-case-select"><span>CASE</span><strong>{selectedCase.investigationNumber}</strong></div> : undefined} />
     <section className="panel">
       <SectionHeader label="CONTROLLED WORKFLOW" meta={selectedCase ? selectedCase.id : "NO CASE SELECTED"} />
       {workflowContent}
-      {selectedCase && snapshot.investigators.length > 0 && <div className="workflow-config-form"><div className="mini-heading">CONFIGURE ASSIGNMENTS</div>{([['acquisitionInvestigatorId', 'ACQUISITION'], ['recoveryInvestigatorId', 'RECOVERY'], ['validationInvestigatorId', 'VALIDATION'], ['analysisInvestigatorId', 'ANALYSIS']] as const).map(([stage, label]) => <label key={stage}>{label}<select value={assignments[stage]} onChange={(event) => updateAssignment(stage, event.target.value)}><option value="">Select investigator</option>{snapshot.investigators.map((investigator) => <option key={investigator.id} value={investigator.id}>{investigator.name} ({investigator.id})</option>)}</select></label>)}<button className="primary-button" disabled={saving || Object.values(assignments).some((value) => !value)} onClick={() => void configure()}>{saving ? "Saving…" : "Save workflow configuration"}</button></div>}
+      {selectedCase && snapshot.investigators.length > 0 ? <div className="workflow-config-form"><div className="mini-heading">CONFIGURE ASSIGNMENTS</div>{([['acquisitionInvestigatorId', 'ACQUISITION'], ['recoveryInvestigatorId', 'RECOVERY'], ['validationInvestigatorId', 'VALIDATION'], ['analysisInvestigatorId', 'ANALYSIS']] as const).map(([stage, label]) => <label key={stage}>{label}<select value={assignments[stage]} onChange={(event) => updateAssignment(stage, event.target.value)}><option value="">Select investigator</option>{snapshot.investigators.map((investigator) => <option key={investigator.id} value={investigator.id}>{investigator.name} ({investigator.id})</option>)}</select></label>)}<button className="primary-button" disabled={saving || Object.values(assignments).some((value) => !value)} onClick={() => void configure()}>{saving ? "Saving…" : "Save workflow configuration"}</button></div> : selectedCase ? <UnavailableState feature="Workflow configuration unavailable" detail="No eligible investigators were returned by the Admin investigator endpoint." /> : null}
       <div className="context-note"><ShieldCheck size={15} /><span>Assignment changes are governed by the existing admin-only workflow endpoint; this view does not invent client-side permissions.</span></div>
     </section>
   </div>;
 }
 
 function InvestigatorsPage({ snapshot }: { snapshot: BackendSnapshot }) {
-  return <div className="page-stack"><PageHeader eyebrow="OPERATOR REGISTRY / ADMIN" title="Investigators" description="Investigator accounts returned by the existing administrator endpoint." /><section className="panel"><SectionHeader label="INVESTIGATOR REGISTRY" meta={`${snapshot.investigators.length} RETURNED`} /><DataTable columns={["USER ID", "NAME", "ROLE SOURCE"]}>{snapshot.investigators.map((investigator) => <tr key={investigator.id}><td><span className="mono emphasis">{investigator.id}</span></td><td><strong>{investigator.name}</strong></td><td className="muted-cell">GET /admin/users</td></tr>)}</DataTable>{snapshot.investigators.length === 0 && <EmptyState icon={Users} title="No investigators returned" detail="The administrator endpoint returned an empty registry." />}</section><section className="panel"><UnavailableState feature="Investigator profiles and clearance" detail="The repository contains investigator profile schema and creation validation, but no admin GET endpoint returns profile, clearance, session or task details." /></section></div>;
+  return <div className="page-stack"><PageHeader eyebrow="OPERATOR REGISTRY / ADMIN" title="Investigators" description="Investigator accounts returned by the existing administrator endpoint." /><section className="panel"><SectionHeader label="INVESTIGATOR REGISTRY" meta={`${snapshot.investigators.length} RETURNED`} /><DataTable columns={["USER ID", "NAME", "ROLE SOURCE"]}>{snapshot.investigators.map((investigator) => <tr key={investigator.id}><td><span className="mono emphasis">{investigator.id}</span></td><td><strong>{investigator.name}</strong></td><td className="muted-cell">GET /admin/investigators</td></tr>)}</DataTable>{snapshot.investigators.length === 0 && <EmptyState icon={Users} title="No investigators returned" detail="The administrator endpoint returned an empty registry." />}</section><section className="panel"><UnavailableState feature="Investigator profiles and clearance" detail="The repository contains investigator profile schema and creation validation, but no admin GET endpoint returns profile, clearance, session or task details." /></section></div>;
 }
 
 function AuthorizationsPage({ snapshot }: { snapshot: BackendSnapshot }) {

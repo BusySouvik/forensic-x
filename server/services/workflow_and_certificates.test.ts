@@ -57,7 +57,8 @@ beforeEach(async () => {
 
 describe("Investigation workflow and certificates", () => {
   it("Admin can configure workflow and audit event recorded", async () => {
-    const { configureWorkflow } = await import("./investigationWorkflow");
+    const { configureWorkflow, getWorkflow } = await import("./investigationWorkflow");
+    await expect(getWorkflow(investigationId)).rejects.toMatchObject({ statusCode: 409 });
     const workflow = await configureWorkflow({
       investigationId,
       actorId: adminId,
@@ -68,11 +69,40 @@ describe("Investigation workflow and certificates", () => {
     });
 
     expect(workflow).toBeTruthy();
+    await expect(getWorkflow(investigationId)).resolves.toMatchObject({
+      investigationId,
+      acquisitionInvestigatorId: investigator1,
+      recoveryInvestigatorId: investigator1,
+      validationInvestigatorId: investigator2,
+      analysisInvestigatorId: investigator2,
+    });
+    const workflowRows = await realDb.select().from((await import("../db/schema")).investigationWorkflows).where(eq((await import("../db/schema")).investigationWorkflows.investigationId, investigationId));
+    expect(workflowRows).toHaveLength(1);
     {
       const schema = await import("../db/schema");
       const rows = await realDb.select().from(schema.auditEvents).where(eq(schema.auditEvents.investigationId, investigationId)).limit(1000);
       expect((rows || []).length).toBeGreaterThan(0);
     }
+  });
+
+  it("rejects invalid workflow investigators and recovery/validation self-review", async () => {
+    const { configureWorkflow } = await import("./investigationWorkflow");
+    await expect(configureWorkflow({
+      investigationId,
+      actorId: adminId,
+      acquisitionInvestigatorId: investigator1,
+      recoveryInvestigatorId: investigator1,
+      validationInvestigatorId: "44444444-4444-4444-8444-444444444444",
+      analysisInvestigatorId: investigator2,
+    })).rejects.toMatchObject({ statusCode: 404 });
+    await expect(configureWorkflow({
+      investigationId,
+      actorId: adminId,
+      acquisitionInvestigatorId: investigator1,
+      recoveryInvestigatorId: investigator1,
+      validationInvestigatorId: investigator1,
+      analysisInvestigatorId: investigator2,
+    })).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it("Wrong investigator cannot access assigned stage", async () => {

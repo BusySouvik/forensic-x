@@ -32,6 +32,9 @@ export async function configureWorkflow(input: {
   const [investigation] = await db.select({ id: investigations.id }).from(investigations).where(eq(investigations.id, input.investigationId)).limit(1);
   if (!investigation) throw new HttpError(404, "Investigation not found");
   const ids = [input.acquisitionInvestigatorId, input.recoveryInvestigatorId, input.validationInvestigatorId, input.analysisInvestigatorId];
+  if (input.validationInvestigatorId === input.recoveryInvestigatorId) {
+    throw new HttpError(400, "Validation must be assigned to an investigator independent from recovery");
+  }
   const selected = await db.select({ id: users.id, role: users.role }).from(users);
   for (const id of ids) {
     const user = selected.find((item) => item.id === id);

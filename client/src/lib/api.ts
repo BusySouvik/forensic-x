@@ -194,7 +194,7 @@ export async function listInvestigations() {
 }
 
 export async function listInvestigators() {
-  return request<{ users: Array<{ id: string; name: string }> }>("/admin/users");
+  return request<{ users: Array<{ id: string; name: string }> }>("/admin/investigators");
 }
 
 export async function listAuthorizations(status?: string) {

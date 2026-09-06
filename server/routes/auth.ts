@@ -59,15 +59,23 @@ authRouter.post(
   }),
 );
 
-authRouter.get(
-  "/admin/users",
-  requireAuth,
-  requireRole("ADMIN"),
-  asyncHandler(async (_req, res) => {
-    const db = await import("../db");
+const listInvestigatorsForAdmin = asyncHandler(async (_req, res) => {
     const { users } = await import("../db/schema");
     const { getDb } = await import("../db");
     const rows = await getDb().select({ id: users.id, name: users.name, role: users.role }).from(users).where(eq(users.role, "INVESTIGATOR"));
     res.json({ users: rows.map((r: any) => ({ id: r.id, name: r.name })) });
-  }),
+  });
+
+authRouter.get(
+  "/admin/users",
+  requireAuth,
+  requireRole("ADMIN"),
+  listInvestigatorsForAdmin,
+);
+
+authRouter.get(
+  "/admin/investigators",
+  requireAuth,
+  requireRole("ADMIN"),
+  listInvestigatorsForAdmin,
 );
