@@ -1,12 +1,16 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AcquisitionWorker } from "../agent/worker/acquisitionWorker";
 import { TestFileAcquisitionAdapter } from "../agent/adapters/testFileAcquisition";
 import { MemoryObjectStore } from "../storage/memoryObjectStore";
 import { createEvidenceStorageService, MemoryStorageReferenceStore } from "./evidenceStorage";
 import { createAcquisitionService, type AcquisitionJobRecord, type AcquisitionRepository } from "./acquisitions";
+
+vi.mock("./ledger", () => ({
+  recordAcquisitionEvent: vi.fn().mockResolvedValue(null),
+}));
 
 class MemoryAcquisitionRepository implements AcquisitionRepository {
   private readonly jobs = new Map<string, AcquisitionJobRecord>();
