@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getDb } from "../db";
 import * as schema from "../db/schema";
 import { eq } from "drizzle-orm";
@@ -11,15 +11,19 @@ const authId = "deadbeef-cccc-4555-8555-deadbeef0003";
 const storageObjectId = "deadbeef-dddd-4666-8666-deadbeef0004";
 const evidenceId = "deadbeef-eeee-4333-8333-deadbeef0005";
 
-beforeEach(async () => {
+async function cleanupFixture() {
   const db = getDb();
-  // Clean up any previous fixtures
   await db.delete(schema.ledger_events).where(eq(schema.ledger_events.investigationId, investigationId)).returning();
   await db.delete(schema.evidenceRecords).where(eq(schema.evidenceRecords.investigationId, investigationId)).returning();
   await db.delete(schema.acquisitionJobs).where(eq(schema.acquisitionJobs.investigationId, investigationId)).returning();
   await db.delete(schema.storageObjects).where(eq(schema.storageObjects.investigationId, investigationId)).returning();
   await db.delete(schema.operationAuthorizations).where(eq(schema.operationAuthorizations.investigationId, investigationId)).returning();
   await db.delete(schema.investigations).where(eq(schema.investigations.id, investigationId)).returning();
+}
+
+beforeEach(async () => {
+  const db = getDb();
+  await cleanupFixture();
 
   // Insert base fixtures
   const [existingUser] = await db.select().from(schema.users).where(eq(schema.users.id, adminId)).limit(1);
@@ -32,6 +36,8 @@ beforeEach(async () => {
   await db.insert(schema.acquisitionJobs).values({ id: jobId, investigationId, deviceId: null, requestedBy: adminId, authorizationId: authId, sourceType: "TEST_FILE", sourceIdentifier: "x", outputStorageObjectId: null, sha256: null, size: null, startedAt: null, completedAt: null, errorMessage: null, createdAt: new Date(), updatedAt: new Date() }).returning();
   await db.insert(schema.evidenceRecords).values({ id: evidenceId, investigationId, acquisitionJobId: jobId, masterStorageObjectId: storageObjectId, sha256: "msha1", size: 123, status: "AVAILABLE", createdAt: new Date() }).returning();
 });
+
+afterEach(cleanupFixture);
 
 describe("ledger concurrency/idempotency", () => {
   it("concurrent calls create exactly one ledger_events row and return same id", async () => {

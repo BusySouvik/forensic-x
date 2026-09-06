@@ -128,8 +128,8 @@ const adminSections: { title: string; items: NavItem[] }[] = [
     title: "OVERVIEW",
     items: [
       { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { key: "investigations", label: "Investigations", icon: BriefcaseBusiness, badge: "08" },
-      { key: "evidence", label: "Evidence", icon: Boxes, badge: "24" },
+      { key: "investigations", label: "Investigations", icon: BriefcaseBusiness },
+      { key: "evidence", label: "Evidence", icon: Boxes },
       { key: "devices", label: "Devices", icon: Laptop },
     ],
   },
@@ -137,8 +137,8 @@ const adminSections: { title: string; items: NavItem[] }[] = [
     title: "WORKFLOW CONTROL",
     items: [
       { key: "acquisition", label: "Acquisition", icon: ArrowDownToLine },
-      { key: "recovery", label: "Recovery", icon: RefreshCw, badge: "04" },
-      { key: "validation", label: "Validation", icon: FileCheck2, badge: "03" },
+      { key: "recovery", label: "Recovery", icon: RefreshCw },
+      { key: "validation", label: "Validation", icon: FileCheck2 },
       { key: "analysis", label: "Analysis", icon: Binary },
       { key: "sanitization", label: "Sanitization", icon: Archive },
     ],
@@ -147,8 +147,8 @@ const adminSections: { title: string; items: NavItem[] }[] = [
     title: "ACCESS CONTROL",
     items: [
       { key: "investigators", label: "Investigators", icon: Users },
-      { key: "assignment", label: "Task Assignment", icon: ListChecks, badge: "03" },
-      { key: "authorizations", label: "Authorizations", icon: KeyRound, badge: "03" },
+      { key: "assignment", label: "Task Assignment", icon: ListChecks },
+      { key: "authorizations", label: "Authorizations", icon: KeyRound },
       { key: "permissions", label: "Permissions", icon: SlidersHorizontal },
     ],
   },
@@ -172,8 +172,8 @@ const adminSections: { title: string; items: NavItem[] }[] = [
 
 const investigatorItems: NavItem[] = [
   { key: "dashboard", label: "My Dashboard", icon: LayoutDashboard },
-  { key: "investigations", label: "My Investigations", icon: BriefcaseBusiness, badge: "03" },
-  { key: "assignment", label: "My Tasks", icon: ListChecks, badge: "02" },
+  { key: "investigations", label: "My Investigations", icon: BriefcaseBusiness },
+  { key: "assignment", label: "My Tasks", icon: ListChecks },
   { key: "evidence", label: "Evidence", icon: Boxes },
   { key: "recovery", label: "Recovery", icon: RefreshCw },
   { key: "validation", label: "Validation", icon: FileCheck2 },
@@ -374,13 +374,22 @@ function InvestigatorsPage({ snapshot }: { snapshot: BackendSnapshot }) {
 
 function AuthorizationsPage({ snapshot }: { snapshot: BackendSnapshot }) {
   const isAdmin = snapshot.user.role === "ADMIN";
-  return <div className="page-stack"><PageHeader eyebrow="AUTHORIZATION / LIVE REQUESTS" title="Authorization requests" description="Operation authorizations returned by the backend. Approval and denial remain server-enforced." /><section className="panel"><SectionHeader label="OPERATION REQUESTS" meta={`${snapshot.authorizations.length} RETURNED`} /><DataTable columns={["REQUEST", "INVESTIGATION", "OPERATION", "REQUESTED BY", "STATUS", "REQUESTED AT", ""]}>{snapshot.authorizations.map((item) => <tr key={item.id}><td><span className="mono emphasis">{item.id}</span></td><td className="mono">{investigationLabel(snapshot, item.investigationId)}</td><td>{item.operationType}</td><td className="mono">{item.requestedBy}</td><td><StatusPill status={item.status} /></td><td className="muted-cell">{formatDate(item.requestedAt)}</td><td>{isAdmin && item.status === "PENDING" ? <div className="inline-actions"><button className="row-action" onClick={() => toast("Use the connected backend approval action from the API client.")}><Check size={14} /></button><button className="row-action" onClick={() => toast("Use the connected backend denial action from the API client.")}><X size={14} /></button></div> : null}</td></tr>)}</DataTable>{snapshot.authorizations.length === 0 && <EmptyState icon={Shield} title="No authorization requests" detail="No requests were returned by the backend." />}</section></div>;
+  const decide = async (id: string, decision: "approve" | "deny") => {
+    try {
+      await decideAuthorization(id, decision);
+      toast(`Authorization ${decision === "approve" ? "approved" : "denied"} by backend.`);
+      window.location.reload();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : `Authorization ${decision} failed.`);
+    }
+  };
+  return <div className="page-stack"><PageHeader eyebrow="AUTHORIZATION / LIVE REQUESTS" title="Authorization requests" description="Operation authorizations returned by the backend. Approval and denial remain server-enforced." /><section className="panel"><SectionHeader label="OPERATION REQUESTS" meta={`${snapshot.authorizations.length} RETURNED`} /><DataTable columns={["REQUEST", "INVESTIGATION", "OPERATION", "REQUESTED BY", "STATUS", "REQUESTED AT", ""]}>{snapshot.authorizations.map((item) => <tr key={item.id}><td><span className="mono emphasis">{item.id}</span></td><td className="mono">{investigationLabel(snapshot, item.investigationId)}</td><td>{item.operationType}</td><td className="mono">{item.requestedBy}</td><td><StatusPill status={item.status} /></td><td className="muted-cell">{formatDate(item.requestedAt)}</td><td>{isAdmin && item.status === "PENDING" ? <div className="inline-actions"><button className="row-action" aria-label="Approve authorization" onClick={() => void decide(item.id, "approve")}><Check size={14} /></button><button className="row-action" aria-label="Deny authorization" onClick={() => void decide(item.id, "deny")}><X size={14} /></button></div> : null}</td></tr>)}</DataTable>{snapshot.authorizations.length === 0 && <EmptyState icon={Shield} title="No authorization requests" detail="No requests were returned by the backend." />}</section></div>;
 }
 
 function GovernancePage({ page, snapshot }: { page: PageKey; snapshot: BackendSnapshot }) {
   if (page === "system") return <div className="page-stack"><PageHeader eyebrow="SYSTEM / HEALTH ENDPOINT" title="System status" description="Only health information exposed by the backend is shown." /><section className="panel"><DataTable columns={["SERVICE", "STATUS", "TIMESTAMP"]}><tr><td>{snapshot.health?.service || "forensic-x"}</td><td><StatusPill status={snapshot.health?.status === "ok" ? "OPERATIONAL" : "UNAVAILABLE"} /></td><td className="muted-cell">{formatDate(snapshot.health?.timestamp)}</td></tr></DataTable></section></div>;
   const labels: Record<string, string> = { custody: "Chain of custody", ledger: "Blockchain ledger", audit: "Audit log", agent: "Forensic agent" };
-  return <div className="page-stack"><PageHeader eyebrow="FORENSIC GOVERNANCE" title={labels[page] || "Governance"} description="This screen is intentionally explicit about backend coverage." /><section className="panel"><UnavailableState feature={labels[page] || "Governance feature"} detail="No corresponding backend route is mounted in server/routes/index.ts. No custody events, audit rows, ledger blocks or blockchain verification are fabricated." /></section></div>;
+  return <div className="page-stack"><PageHeader eyebrow="FORENSIC GOVERNANCE" title={labels[page] || "Governance"} description="This screen is intentionally explicit about backend coverage." /><section className="panel"><UnavailableState feature={labels[page] || "Governance feature"} detail="This feature is not exposed by the current backend. No custody events, audit rows, ledger blocks or blockchain verification are fabricated." /></section></div>;
 }
 
 function InvestigatorDashboard({ snapshot, onNavigate }: { snapshot: BackendSnapshot; onNavigate: (page: PageKey) => void }) {
@@ -429,7 +438,10 @@ function AppConsole({ role, onLogout }: { role: Exclude<Role, "gateway">; onLogo
         const optional = async <T,>(label: string, task: () => Promise<T>, emptyValue: T) => {
           try { return await task(); } catch (error) {
             const status = (error as Error & { status?: number }).status;
-            if (status === 404) { unavailable.push(label); return emptyValue; }
+            if (status === 403) { unavailable.push(`${label} (access denied)`); return emptyValue; }
+            if (status === 404) { unavailable.push(`${label} (not exposed or not found)`); return emptyValue; }
+            if (status === 409) { unavailable.push(`${label} (workflow/state conflict)`); return emptyValue; }
+            if (label === "health") { unavailable.push("health (backend error)"); return emptyValue; }
             throw error;
           }
         };
