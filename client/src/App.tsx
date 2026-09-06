@@ -13,5 +13,3 @@ export default function App() {
     </ErrorBoundary>
   );
 }
-
-// Frontend-only demo: no real disk, recovery, erasure, ledger, or external API operations are performed.
