@@ -164,3 +164,16 @@ export const createSanitizationJobSchema = z.object({
 });
 
 export const validateCertificateSchema = z.object({});
+
+export const rejectCertificateSchema = z.object({
+  reason: z.string().trim().min(1).max(5000),
+});
+
+export const createAnalysisJobSchema = z.object({
+  validationCertificateId: uuidSchema,
+});
+
+export const analysisJobParamsSchema = z.object({
+  investigationId: uuidSchema,
+  id: uuidSchema,
+});

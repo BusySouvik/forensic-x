@@ -8,6 +8,8 @@ import { investigationsRouter } from "./investigations";
 import { recoveryJobsRouter } from "./recoveryJobs";
 import { recoveryCertificatesRouter } from "./recoveryCertificates";
 import { analysisRouter } from "./analysis";
+import { analysisJobsRouter } from "./analysisJobs";
+import { registryRouter } from "./registry";
 import { sanitizationRouter } from "./sanitization";
 import { storageRouter } from "./storage";
 import { workingCopiesRouter } from "./workingCopies";
@@ -24,6 +26,8 @@ apiRouter.use(workingCopiesRouter);
 apiRouter.use(recoveryJobsRouter);
 apiRouter.use(recoveryCertificatesRouter);
 apiRouter.use(analysisRouter);
+apiRouter.use(analysisJobsRouter);
+apiRouter.use(registryRouter);
 apiRouter.use(sanitizationRouter);
 apiRouter.use(storageRouter);
 

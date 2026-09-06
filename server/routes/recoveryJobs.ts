@@ -5,11 +5,13 @@ import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler } from "../middleware/errorHandler";
 import { validate } from "../middleware/validate";
 import { createRecoveryJobService, DrizzleRecoveryJobRepository, logRecoveryJobAudit } from "../services/recoveryJobs";
-import { getInvestigation } from "../services/investigations";
+import { getInvestigation, assertInvestigationAccess } from "../services/investigations";
 import { getAuthorizationById } from "../services/authorizations";
 import { getMasterEvidenceById } from "../services/evidenceStorage";
 import { getWorkingCopyById } from "../services/workingCopies";
 import { assertStageAccess } from "../services/investigationWorkflow";
+import { listRecoveredArtifacts } from "../services/registry";
+import { HttpError } from "../middleware/httpError";
 
 export const recoveryJobsRouter = Router();
 
@@ -68,6 +70,7 @@ recoveryJobsRouter.get(
   requireRole("ADMIN", "INVESTIGATOR"),
   validate(investigationIdParamSchema, "params"),
   asyncHandler(async (req, res) => {
+    await assertInvestigationAccess(req.params.investigationId, { id: req.user!.sub, role: req.user!.role });
     const items = await recoveryJobService.listForInvestigation(req.params.investigationId);
     res.json({ recoveryJobs: items });
   }),
@@ -101,6 +104,8 @@ recoveryJobsRouter.get(
   validate(idParamSchema, "params"),
   asyncHandler(async (req, res) => {
     const job = await recoveryJobService.getById(req.params.id);
+    await assertInvestigationAccess(job.investigationId, { id: req.user!.sub, role: req.user!.role });
+    if (req.user!.role !== "ADMIN" && job.requestedBy !== req.user!.sub) throw new HttpError(403, "Recovery job is not accessible to this investigator");
     res.json({ recoveryJob: job });
   }),
 );
@@ -111,14 +116,11 @@ recoveryJobsRouter.get(
   requireRole("ADMIN", "INVESTIGATOR"),
   validate(recoveryResultsParamsSchema, "params"),
   asyncHandler(async (req, res) => {
-    res.json({
-      investigationId: req.params.investigationId,
-      recoveryJobId: req.params.id,
-      status: "PENDING_VALIDATION",
-      artifacts: [],
-      message: "Recovery results are pending validation and are not authoritative evidence.",
-      generatedAt: new Date().toISOString(),
-    });
+    const job = await recoveryJobService.getById(req.params.id);
+    if (job.investigationId !== req.params.investigationId) throw new HttpError(404, "Recovery job not found");
+    if (req.user!.role !== "ADMIN" && job.requestedBy !== req.user!.sub) throw new HttpError(403, "Recovery job is not accessible to this investigator");
+    const artifacts = (await listRecoveredArtifacts(req.params.investigationId)).filter((row) => row.artifact.recoveryJobId === req.params.id);
+    res.json({ investigationId: req.params.investigationId, recoveryJobId: req.params.id, status: job.status, artifacts, message: artifacts.length > 0 ? "Persisted recovered candidates returned." : "No recovered candidates have been persisted for this job." });
   }),
 );
 
@@ -128,13 +130,10 @@ recoveryJobsRouter.get(
   requireRole("ADMIN", "INVESTIGATOR"),
   validate(recoveryResultsParamsSchema, "params"),
   asyncHandler(async (req, res) => {
-    res.json({
-      investigationId: req.params.investigationId,
-      recoveryJobId: req.params.id,
-      status: "PENDING_VALIDATION",
-      artifacts: [],
-      message: "Recovery results are pending validation and are not authoritative evidence.",
-      generatedAt: new Date().toISOString(),
-    });
+    const job = await recoveryJobService.getById(req.params.id);
+    if (job.investigationId !== req.params.investigationId) throw new HttpError(404, "Recovery job not found");
+    if (req.user!.role !== "ADMIN" && job.requestedBy !== req.user!.sub) throw new HttpError(403, "Recovery job is not accessible to this investigator");
+    const artifacts = (await listRecoveredArtifacts(req.params.investigationId)).filter((row) => row.artifact.recoveryJobId === req.params.id);
+    res.json({ investigationId: req.params.investigationId, recoveryJobId: req.params.id, status: job.status, artifacts, message: artifacts.length > 0 ? "Persisted recovered candidates returned." : "No recovered candidates have been persisted for this job." });
   }),
 );

@@ -6,7 +6,7 @@ import { HttpError } from "../middleware/httpError";
 import { validate } from "../middleware/validate";
 import { createWorkingCopyService, DrizzleWorkingCopyRepository, logWorkingCopyAudit } from "../services/workingCopies";
 import { getEvidenceStorageService } from "../services/evidenceStorage";
-import { getInvestigation } from "../services/investigations";
+import { getInvestigation, assertInvestigationAccess } from "../services/investigations";
 
 export const workingCopiesRouter = Router();
 
@@ -51,6 +51,8 @@ workingCopiesRouter.get(
   validate(idParamSchema, "params"),
   asyncHandler(async (req, res) => {
     const workingCopy = await workingCopyService.getById(req.params.id);
+    await assertInvestigationAccess(workingCopy.investigationId, { id: req.user!.sub, role: req.user!.role });
+    if (req.user!.role !== "ADMIN" && workingCopy.investigatorId !== req.user!.sub) throw new HttpError(403, "Working copy is not accessible to this investigator");
     res.json({ workingCopy });
   }),
 );
@@ -61,6 +63,7 @@ workingCopiesRouter.get(
   requireRole("ADMIN", "INVESTIGATOR"),
   validate(investigationIdParamSchema, "params"),
   asyncHandler(async (req, res) => {
+    await assertInvestigationAccess(req.params.investigationId, { id: req.user!.sub, role: req.user!.role });
     const items = await workingCopyService.listForInvestigation(req.params.investigationId);
     res.json({ workingCopies: items });
   }),
@@ -73,6 +76,7 @@ workingCopiesRouter.delete(
   validate(idParamSchema, "params"),
   asyncHandler(async (req, res) => {
     const workingCopy = await workingCopyService.getById(req.params.id);
+    await assertInvestigationAccess(workingCopy.investigationId, { id: req.user!.sub, role: req.user!.role });
     if (req.user!.role !== "ADMIN" && workingCopy.investigatorId !== req.user!.sub) {
       throw new HttpError(403, "You do not own this working copy");
     }

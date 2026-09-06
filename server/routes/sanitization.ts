@@ -10,6 +10,8 @@ import { asyncHandler } from "../middleware/errorHandler";
 import { HttpError } from "../middleware/httpError";
 import { validate } from "../middleware/validate";
 import { createSanitizationJobService, DrizzleSanitizationJobRepository, logSanitizationJobAudit } from "../services/sanitizationJobs";
+import { getSanitizationCertificateById } from "../services/sanitizationCertificates";
+import { assertInvestigationAccess } from "../services/investigations";
 
 export const sanitizationRouter = Router();
 const service = createSanitizationJobService({ repository: new DrizzleSanitizationJobRepository(), auditLogger: logSanitizationJobAudit });
@@ -60,9 +62,16 @@ sanitizationRouter.post("/sanitization/jobs", requireAuth, requireRole("ADMIN", 
 
 sanitizationRouter.get("/sanitization/jobs/:id", requireAuth, requireRole("ADMIN", "INVESTIGATOR"), validate(idParamSchema, "params"), asyncHandler(async (req, res) => res.json({ sanitizationJob: await assertJobAccess(req.params.id, req.user!.sub, req.user!.role) })));
 sanitizationRouter.get("/investigations/:investigationId/sanitization/jobs", requireAuth, requireRole("ADMIN", "INVESTIGATOR"), validate(investigationIdParamSchema, "params"), asyncHandler(async (req, res) => {
+  await assertInvestigationAccess(req.params.investigationId, { id: req.user!.sub, role: req.user!.role });
   const jobs = await service.listForInvestigation(req.params.investigationId);
   res.json({ sanitizationJobs: req.user!.role === "ADMIN" ? jobs : jobs.filter((job) => job.requestedBy === req.user!.sub) });
 }));
+sanitizationRouter.get("/sanitization/certificates/:id", requireAuth, requireRole("ADMIN", "INVESTIGATOR"), validate(idParamSchema, "params"), asyncHandler(async (req, res) => {
+  const certificate = await getSanitizationCertificateById(req.params.id);
+  await assertInvestigationAccess(certificate.investigationId, { id: req.user!.sub, role: req.user!.role });
+  res.json({ certificate });
+}));
+
 sanitizationRouter.post("/sanitization/jobs/:id/execute", requireAuth, requireRole("ADMIN", "INVESTIGATOR"), validate(idParamSchema, "params"), asyncHandler(async (req, res) => {
   await assertJobAccess(req.params.id, req.user!.sub, req.user!.role);
   res.json({ sanitizationJob: await service.enqueueAuthorizedJob(req.params.id, req.user!.sub) });

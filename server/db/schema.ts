@@ -70,6 +70,14 @@ export const auditEventTypeEnum = pgEnum("audit_event_type", [
   "FAILED",
   "CANCELLED",
 ]);
+export const analysisJobStatusEnum = pgEnum("analysis_job_status", [
+  "QUEUED",
+  "WAITING_FOR_WORKER",
+  "RUNNING",
+  "COMPLETED",
+  "FAILED",
+  "CANCELLED",
+]);
 export const evidenceStatusEnum = pgEnum("evidence_status", ["AVAILABLE", "REJECTED"]);
 export const recoveryMethodEnum = pgEnum("recovery_method", ["FILESYSTEM", "CARVING", "STRING_SEARCH", "TIMELINE"]);
 export const recoveryEngineEnum = pgEnum("recovery_engine", ["TSK", "FOREMOST", "BULK_EXTRACTOR", "CUSTOM"]);
@@ -379,6 +387,33 @@ export const auditEvents = pgTable("audit_events", {
   eventType: auditEventTypeEnum("event_type").notNull(),
   result: text("result").notNull().default("SUCCESS"),
   details: text("details"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const analysisJobs = pgTable("analysis_jobs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  investigationId: uuid("investigation_id").notNull().references(() => investigations.id, { onDelete: "cascade" }),
+  requestedBy: uuid("requested_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  validationCertificateId: uuid("validation_certificate_id").notNull().references(() => recoveryCertificates.id, { onDelete: "restrict" }),
+  workingCopyId: uuid("working_copy_id").notNull().references(() => workingCopies.id, { onDelete: "restrict" }),
+  status: analysisJobStatusEnum("status").notNull().default("QUEUED"),
+  inputSha256: text("input_sha256"),
+  resultStorageObjectId: uuid("result_storage_object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+  outputSha256: text("output_sha256"),
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const analysisResults = pgTable("analysis_results", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  analysisJobId: uuid("analysis_job_id").notNull().references(() => analysisJobs.id, { onDelete: "cascade" }),
+  investigationId: uuid("investigation_id").notNull().references(() => investigations.id, { onDelete: "cascade" }),
+  storageObjectId: uuid("storage_object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+  outputSha256: text("output_sha256"),
+  metadata: jsonb("metadata").notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

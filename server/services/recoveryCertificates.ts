@@ -218,3 +218,38 @@ export async function validateAndSignCertificate(input: { certificateId: string;
 
   return updated;
 }
+
+
+export async function rejectCertificate(input: { certificateId: string; actorId: string; investigationId: string; reason: string }) {
+  const db = getDb();
+  const cert = await getCertificateById(input.certificateId);
+  if (cert.investigationId !== input.investigationId) throw new HttpError(403, "Certificate does not belong to investigation");
+  const reason = input.reason.trim();
+  if (!reason) throw new HttpError(400, "Rejection reason is required");
+  const validationDetails = {
+    decision: "REJECTED",
+    reason,
+    rejectedAt: new Date().toISOString(),
+  };
+  const validationSignature = signingService.signPayload(input.actorId, {
+    certificateId: cert.id,
+    result: "REJECTED",
+    details: validationDetails,
+  });
+  const [updated] = await db.update(recoveryCertificates).set({
+    status: "VALIDATION_FAILED",
+    validationSignature: validationSignature.signature,
+    validationSignerId: input.actorId,
+    validationDetails,
+    updatedAt: new Date(),
+  }).where(eq(recoveryCertificates.id, cert.id)).returning();
+  if (!updated) throw new HttpError(500, "Failed to persist certificate rejection");
+  await db.insert(auditEvents).values({
+    investigationId: input.investigationId,
+    actorId: input.actorId,
+    eventType: "FAILED",
+    result: "VALIDATION_REJECTED",
+    details: `certificate=${cert.id}; reason=${reason}`,
+  });
+  return updated;
+}

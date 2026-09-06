@@ -210,6 +210,10 @@ export class EvidenceStorageService {
     });
   }
 
+  async getById(id: string): Promise<StorageReference | null> {
+    return this.references.getById(id);
+  }
+
   async exists(id: string): Promise<boolean> {
     const record = await this.requireReference(id);
     if (record.status === "DELETED") {

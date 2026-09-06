@@ -63,10 +63,15 @@ import {
   type RecoveryJob,
   type RecoveryCertificate,
   type SanitizationJob,
+  type EvidenceRecord,
+  type RecoveredArtifact,
+  type AuditEvent,
+  type AnalysisJob,
   getHealth,
   getCurrentUser,
   login as apiLogin,
   createInvestigation,
+  createDevice,
   clearAccessToken,
   decideAuthorization,
   listAcquisitions,
@@ -83,6 +88,14 @@ import {
   listSanitizationJobs,
   saveWorkflow,
   startAnalysis as apiStartAnalysis,
+  listEvidence,
+  listRecoveredArtifacts,
+  listAuditEvents,
+  listAnalysisJobs,
+  createAnalysisJob,
+  validateCertificate,
+  rejectCertificate,
+  recoveredArtifactDownloadUrl,
 } from "@/lib/api";
 
 type Role = "gateway" | "administrator" | "investigator";
@@ -122,6 +135,10 @@ type BackendSnapshot = {
   recoveryJobs: RecoveryJob[];
   certificates: RecoveryCertificate[];
   sanitizationJobs: SanitizationJob[];
+  evidence: EvidenceRecord[];
+  artifacts: RecoveredArtifact[];
+  auditEvents: AuditEvent[];
+  analysisJobs: AnalysisJob[];
   unavailable: string[];
   loading: boolean;
   error: string | null;
@@ -377,12 +394,16 @@ function InvestigationsPage({ snapshot, canCreate = false }: { snapshot: Backend
   return <div className="page-stack"><PageHeader eyebrow="CASE MANAGEMENT / LIVE REGISTER" title="Investigations" description="Investigation records returned by the existing backend." actions={canCreate ? <button className="primary-button" onClick={() => setCreateOpen(true)}><BriefcaseBusiness size={15} /> New investigation</button> : undefined} /><section className="panel"><div className="table-toolbar"><div className="search-field"><Search size={15} /><input placeholder="Search case number, title or status" value={query} onChange={(e) => setQuery(e.target.value)} /></div></div><DataTable columns={["CASE ID", "TITLE", "DESCRIPTION", "STATUS", "CREATED", "UPDATED"]}>{rows.map((item) => <tr key={item.id}><td><span className="mono emphasis">{item.investigationNumber}</span><span className="cell-sub">{item.id}</span></td><td><strong>{item.title}</strong></td><td className="muted-cell">{item.description || "—"}</td><td><StatusPill status={item.status} /></td><td className="muted-cell">{formatDate(item.createdAt)}</td><td className="muted-cell">{formatDate(item.updatedAt)}</td></tr>)}</DataTable>{rows.length === 0 && <EmptyState icon={BriefcaseBusiness} title="No matching investigations" detail="The backend returned no records for this filter." />}<div className="table-footer"><span>Showing {rows.length} of {snapshot.investigations.length} investigations</span></div></section>{createOpen && canCreate && <Modal title="Create investigation" onClose={() => setCreateOpen(false)}><form className="modal-form" onSubmit={submit}><label>CASE REFERENCE<input name="investigationNumber" placeholder="CASE-0042" required /></label><label>CASE TITLE<input name="title" placeholder="Digital evidence investigation" required /></label><label>DESCRIPTION<textarea name="description" placeholder="Operational context and scope" rows={4} /></label><label>INITIAL STATUS<select name="status" defaultValue="OPEN"><option value="OPEN">OPEN</option><option value="IN_PROGRESS">IN PROGRESS</option></select></label><div className="form-section-label">OPTIONAL OPERATIONAL WORKFLOW</div><div className="modal-select-grid">{([['acquisitionInvestigatorId', 'ACQUISITION'], ['recoveryInvestigatorId', 'RECOVERY'], ['validationInvestigatorId', 'VALIDATION'], ['analysisInvestigatorId', 'ANALYSIS']] as const).map(([name, label]) => <label key={name}>{label}<select name={name} defaultValue=""><option value="">Leave unconfigured</option>{snapshot.investigators.map((investigator) => <option key={investigator.id} value={investigator.id}>{investigator.name} · {investigator.investigatorId || investigator.id}</option>)}</select></label>)}</div><span className="field-help">Select all four to persist the workflow with this case. Recovery and Validation must be different investigators.</span><div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setCreateOpen(false)}>Cancel</button><button className="primary-button" disabled={saving}>{saving ? "Creating…" : "Create investigation"}</button></div></form></Modal>}</div>;
 }
 
-function EvidencePage() {
-  return <div className="page-stack"><PageHeader eyebrow="EVIDENCE REGISTER" title="Master E01 evidence" description="Evidence integrity is only shown when returned by a backend endpoint." /><section className="panel"><UnavailableState feature="Master evidence register" detail="The existing API exposes acquisition output references and storage metadata by ID, but no endpoint lists evidence records or returns a master E01 register. No hashes, sizes or statuses are fabricated here." /></section></div>;
+function EvidencePage({ snapshot }: { snapshot: BackendSnapshot }) {
+  return <div className="page-stack"><PageHeader eyebrow="EVIDENCE REGISTER / ACTIVE INVESTIGATION" title="Master evidence" description="Authoritative evidence records returned from PostgreSQL with MinIO metadata. Master images remain protected." /><section className="panel"><SectionHeader label="PROTECTED MASTER REGISTER" meta={`${snapshot.evidence.length} RETURNED`} /><DataTable columns={["EVIDENCE", "SOURCE DEVICE", "SHA-256", "SIZE", "STORAGE", "PROTECTION"]}>{snapshot.evidence.map((row) => <tr key={row.evidence.id}><td><strong>{row.evidence.id}</strong><span className="cell-sub">Acquisition {row.evidence.acquisitionJobId}</span></td><td>{row.device?.deviceIdentifier || "Source metadata unavailable"}</td><td className="mono muted-cell">{row.evidence.sha256}</td><td>{row.evidence.size} bytes</td><td><span className="mono">{row.storageObject.bucket}</span><span className="cell-sub">{row.storageObject.objectKey}</span></td><td><StatusPill status="MASTER_IMAGE_PROTECTED" /></td></tr>)}</DataTable>{snapshot.evidence.length === 0 && <EmptyState icon={Boxes} title="No master evidence returned" detail="Only persisted evidence records are shown. Complete an authorized acquisition before a master appears here." />}</section></div>;
 }
 
 function DevicesPage({ snapshot }: { snapshot: BackendSnapshot }) {
-  return <div className="page-stack"><PageHeader eyebrow="DEVICE INVENTORY / LIVE REGISTER" title="Devices" description="Acquisition targets returned by the existing device endpoint." /><section className="panel"><SectionHeader label="DEVICE INVENTORY" meta={`${snapshot.devices.length} RETURNED`} /><DataTable columns={["DEVICE IDENTIFIER", "TYPE", "MANUFACTURER", "MODEL", "SERIAL", "CAPACITY", "STATUS"]}>{snapshot.devices.map((device) => <tr key={device.id}><td><span className="mono emphasis">{device.deviceIdentifier}</span><span className="cell-sub">{device.id}</span></td><td>{device.deviceType}</td><td className="muted-cell">{device.manufacturer || "—"}</td><td className="muted-cell">{device.model || "—"}</td><td className="mono muted-cell">{device.serialNumber || "—"}</td><td className="muted-cell">{device.capacity || "—"}</td><td><StatusPill status={device.status} /></td></tr>)}</DataTable>{snapshot.devices.length === 0 && <EmptyState icon={Laptop} title="No devices returned" detail="Select an investigation with registered devices or create one through the backend." />}</section></div>;
+  const investigationId = snapshot.investigations[0]?.id;
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); if (!investigationId) return; const form = new FormData(event.currentTarget); setSaving(true); try { await createDevice(investigationId, { deviceIdentifier: String(form.get("deviceIdentifier")), deviceType: String(form.get("deviceType")), manufacturer: String(form.get("manufacturer") || ""), model: String(form.get("model") || ""), serialNumber: String(form.get("serialNumber") || ""), capacity: String(form.get("capacity") || ""), connectionType: String(form.get("connectionType") || "") }); toast("Registered device persisted by backend."); setOpen(false); window.location.reload(); } catch (error) { toast(error instanceof Error ? error.message : "Device registration failed."); } finally { setSaving(false); } };
+  return <div className="page-stack"><PageHeader eyebrow="DEVICE INVENTORY / REGISTERED DEVICES" title="Devices" description="Registered device metadata is persisted in PostgreSQL. Live physical devices remain Agent-only and are never fabricated in the browser." actions={snapshot.user.role === "ADMIN" && investigationId ? <button className="primary-button" onClick={() => setOpen(true)}><Laptop size={15} /> Register device</button> : undefined} /><section className="panel"><SectionHeader label="REGISTERED DEVICE INVENTORY" meta={`${snapshot.devices.length} RETURNED`} /><DataTable columns={["DEVICE IDENTIFIER", "TYPE", "MANUFACTURER", "MODEL", "SERIAL", "CAPACITY", "STATUS"]}>{snapshot.devices.map((device) => <tr key={device.id}><td><span className="mono emphasis">{device.deviceIdentifier}</span><span className="cell-sub">{device.id}</span></td><td>{device.deviceType}</td><td className="muted-cell">{device.manufacturer || "—"}</td><td className="muted-cell">{device.model || "—"}</td><td className="mono muted-cell">{device.serialNumber || "—"}</td><td className="muted-cell">{device.capacity || "—"}</td><td><StatusPill status={device.status} /></td></tr>)}</DataTable>{snapshot.devices.length === 0 && <EmptyState icon={Laptop} title="No registered devices returned" detail="Register a persisted device record or connect the privileged Agent for live enumeration." />}</section>{open && <Modal title="Register device metadata" onClose={() => setOpen(false)}><form className="modal-form" onSubmit={submit}><label>DEVICE IDENTIFIER<input name="deviceIdentifier" required /></label><label>DEVICE TYPE<select name="deviceType" defaultValue="OTHER"><option>HDD</option><option>SSD</option><option>NVME</option><option>USB</option><option>MOBILE</option><option>OPTICAL</option><option>OTHER</option></select></label><label>MANUFACTURER<input name="manufacturer" /></label><label>MODEL<input name="model" /></label><label>SERIAL NUMBER<input name="serialNumber" /></label><label>CAPACITY<input name="capacity" placeholder="1 TB" /></label><label>CONNECTION TYPE<select name="connectionType" defaultValue=""><option value="">Not recorded</option><option>SATA</option><option>USB</option><option>NVME</option><option>NETWORK</option><option>OTHER</option></select></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setOpen(false)}>Cancel</button><button className="primary-button" disabled={saving}>{saving ? "Registering…" : "Register device"}</button></div></form></Modal>}</div>;
 }
 
 function AssignmentPage({ snapshot }: { snapshot: BackendSnapshot }) {
@@ -448,8 +469,10 @@ function AuthorizationsPage({ snapshot }: { snapshot: BackendSnapshot }) {
 
 function GovernancePage({ page, snapshot }: { page: PageKey; snapshot: BackendSnapshot }) {
   if (page === "system") return <div className="page-stack"><PageHeader eyebrow="SYSTEM / HEALTH ENDPOINT" title="System status" description="Only health information exposed by the backend is shown." /><section className="panel"><DataTable columns={["SERVICE", "STATUS", "TIMESTAMP"]}><tr><td>{snapshot.health?.service || "forensic-x"}</td><td><StatusPill status={snapshot.health?.status === "ok" ? "OPERATIONAL" : "UNAVAILABLE"} /></td><td className="muted-cell">{formatDate(snapshot.health?.timestamp)}</td></tr></DataTable></section></div>;
-  const labels: Record<string, string> = { custody: "Chain of custody", ledger: "Blockchain ledger", audit: "Audit log", agent: "Forensic agent" };
-  return <div className="page-stack"><PageHeader eyebrow="FORENSIC GOVERNANCE" title={labels[page] || "Governance"} description="Operational records are shown only when returned by the authoritative service." /><section className="panel"><UnavailableState feature={labels[page] || "Governance feature"} detail="No operational records are currently available from the authoritative service. The console will not infer custody events, audit rows, ledger blocks or blockchain verification." /></section></div>;
+  const labels: Record<string, string> = { custody: "Chain of custody", ledger: "Blockchain ledger", audit: "Audit log", agent: "Forensic agent", storage: "Storage" };
+  if (page === "agent") return <div className="page-stack"><PageHeader eyebrow="FORENSIC AGENT / PRIVILEGED INFRASTRUCTURE" title="Forensic agent" description="Live physical-device access remains outside the browser and requires the configured privileged Agent." /><section className="panel"><UnavailableState feature="Privileged Forensic Agent" detail="Agent unavailable. No live physical devices or physical acquisition completion is fabricated." /></section></div>;
+  if (page === "storage") return <div className="page-stack"><PageHeader eyebrow="STORAGE / INVESTIGATION CONTEXT" title="Storage" description="Binary evidence remains in MinIO; PostgreSQL stores only metadata and references." /><section className="panel"><SectionHeader label="STORAGE REFERENCES" meta={`${snapshot.evidence.length} MASTER OBJECTS`} /><DataTable columns={["OBJECT", "BUCKET", "SHA-256", "POLICY", "STATUS"]}>{snapshot.evidence.map((row) => <tr key={row.storageObject.id}><td className="mono">{row.storageObject.objectKey}</td><td>{row.storageObject.bucket}</td><td className="mono muted-cell">{row.storageObject.sha256}</td><td><StatusPill status={row.storageObject.deletionPolicy} /></td><td><StatusPill status={row.storageObject.status} /></td></tr>)}</DataTable>{snapshot.evidence.length === 0 && <EmptyState icon={HardDrive} title="No storage objects returned" detail="Storage references appear only after persisted evidence exists for the active investigation." />}</section></div>;
+  return <div className="page-stack"><PageHeader eyebrow="FORENSIC GOVERNANCE" title={labels[page] || "Governance"} description="Chronological records returned from PostgreSQL. Fabric status is shown only when persisted by the ledger adapter." /><section className="panel"><SectionHeader label={page === "audit" ? "AUDIT EVENTS" : "CHAIN OF CUSTODY"} meta={`${snapshot.auditEvents.length} EVENTS`} /><DataTable columns={["EVENT", "ACTOR", "RESULT", "DETAILS", "TIMESTAMP"]}>{snapshot.auditEvents.map((row) => <tr key={row.auditEvent.id}><td><strong>{row.auditEvent.eventType}</strong></td><td>{row.actor ? `${row.actor.name} · ${row.actor.role}` : "Actor unavailable"}</td><td><StatusPill status={row.auditEvent.result} /></td><td className="muted-cell">{row.auditEvent.details || "—"}</td><td className="muted-cell">{formatDate(row.auditEvent.createdAt)}</td></tr>)}</DataTable>{snapshot.auditEvents.length === 0 && <EmptyState icon={Fingerprint} title="No operational events returned" detail="The timeline will show persisted acquisition, recovery, validation, analysis and sanitization events for the active investigation." />}</section>{page === "ledger" && <section className="panel"><UnavailableState feature="Fabric validation/sanitization anchors" detail="Fabric anchor unavailable for these lifecycles. PostgreSQL operational events remain authoritative here." /></section>}</div>;
 }
 
 function InvestigatorDashboard({ snapshot, onNavigate }: { snapshot: BackendSnapshot; onNavigate: (page: PageKey) => void }) {
@@ -462,29 +485,42 @@ function TaskWorkspace({ page, snapshot }: { page: PageKey; snapshot: BackendSna
   const [title, Icon] = labels[page] || ["Authorized workspace", ShieldCheck];
   const [actionState, setActionState] = useState<"idle" | "running" | "success" | "error">("idle");
   const investigationId = snapshot.investigations[0]?.id;
+  const validatedCertificate = snapshot.certificates.find((certificate) => certificate.status === "VALIDATED");
   const runAnalysis = async () => {
-    if (!investigationId) return;
+    if (!investigationId || !validatedCertificate) return;
     setActionState("running");
-    try { await apiStartAnalysis(investigationId); setActionState("success"); toast("Analysis start accepted by backend."); }
-    catch (error) { setActionState("error"); toast(error instanceof Error ? error.message : "Analysis start failed."); }
+    try { await createAnalysisJob(investigationId, validatedCertificate.id); setActionState("success"); toast("Analysis job persisted in WAITING_FOR_WORKER state."); }
+    catch (error) { setActionState("error"); toast(error instanceof Error ? error.message : "Analysis job creation failed."); }
+  };
+  const accept = async (certificateId: string) => {
+    if (!investigationId) return;
+    try { await validateCertificate(investigationId, certificateId); toast("Validation decision persisted."); window.location.reload(); }
+    catch (error) { toast(error instanceof Error ? error.message : "Certificate validation failed."); }
+  };
+  const reject = async (certificateId: string) => {
+    if (!investigationId) return;
+    const reason = window.prompt("Reason for rejection (required):", "");
+    if (!reason || !reason.trim()) { toast("A rejection reason is required."); return; }
+    try { await rejectCertificate(investigationId, certificateId, reason); toast("Rejection decision persisted."); window.location.reload(); }
+    catch (error) { toast(error instanceof Error ? error.message : "Certificate rejection failed."); }
   };
   const content = page === "analysis"
-    ? <div className="workspace-actions"><button className="primary-button" disabled={!investigationId || actionState === "running"} onClick={runAnalysis}><ArrowDownToLine size={15} /> {actionState === "running" ? "Starting…" : "Start authorized analysis"}</button><UnavailableState feature="Analysis results" detail="Analysis can be initiated when authorized; no result records are currently available from the service." /></div>
+    ? <div className="workspace-actions"><button className="primary-button" disabled={!investigationId || !validatedCertificate || actionState === "running"} onClick={() => void runAnalysis()}><ArrowDownToLine size={15} /> {actionState === "running" ? "Queueing…" : validatedCertificate ? "Queue analysis job" : "Validation required"}</button><DataTable columns={["JOB", "STATUS", "WORKING COPY", "INPUT SHA-256", "CREATED"]}>{snapshot.analysisJobs.map((job) => <tr key={job.id}><td className="mono">{job.id}</td><td><StatusPill status={job.status} /></td><td className="mono">{job.workingCopyId}</td><td className="mono muted-cell">{job.inputSha256 || "—"}</td><td className="muted-cell">{formatDate(job.createdAt)}</td></tr>)}</DataTable>{snapshot.analysisJobs.length === 0 && <UnavailableState feature="Analysis worker" detail="No analysis job exists for this investigation. Jobs remain truthful WAITING_FOR_WORKER until external worker infrastructure is available." />}</div>
     : page === "validation"
-      ? <UnavailableState feature="Validation queue" detail="No validation queue records are currently available from the authoritative service." />
-      : page === "acquisition"
-        ? <EmptyState icon={Icon} title={`${snapshot.acquisitions.length} acquisition job(s) returned`} detail="Use the backend request schema with an approved acquisition authorization; no acquisition is started from fabricated UI state." />
-        : page === "recovery"
-          ? <EmptyState icon={Icon} title={`${snapshot.recoveryJobs.length} recovery job(s) returned`} detail="Recovery results are explicitly pending validation until the backend returns authoritative artifacts." />
+      ? <DataTable columns={["CERTIFICATE", "ARTIFACT SHA-256", "STATUS", "CREATED", "DECISION"]}>{snapshot.certificates.map((certificate) => <tr key={certificate.id}><td className="mono">{certificate.id}</td><td className="mono muted-cell">{certificate.artifactSha256 || "—"}</td><td><StatusPill status={certificate.status} /></td><td className="muted-cell">{formatDate(certificate.createdAt)}</td><td>{certificate.status === "READY_FOR_VALIDATION" ? <div className="inline-actions"><button className="row-action" onClick={() => void accept(certificate.id)} aria-label="Accept certificate"><Check size={14} /></button><button className="row-action" onClick={() => void reject(certificate.id)} aria-label="Reject certificate"><X size={14} /></button></div> : <span className="muted-cell">{certificate.validationSignature ? "Signed" : "Pending"}</span>}</td></tr>)}</DataTable>
+      : page === "recovery"
+        ? <><DataTable columns={["ARTIFACT", "JOB", "METHOD / ENGINE", "SIZE", "SHA-256", "STORAGE", "STATUS"]}>{snapshot.artifacts.map((row) => <tr key={row.artifact.id}><td className="mono">{row.artifact.id}</td><td className="mono">{row.artifact.recoveryJobId}</td><td>{row.artifact.method} / {row.artifact.engine}</td><td>{row.artifact.size ?? "—"}</td><td className="mono muted-cell">{row.artifact.provisionalSha256 || "—"}</td><td>{row.storageObject?.status === "AVAILABLE" ? <a className="text-link" href={investigationId ? recoveredArtifactDownloadUrl(investigationId, row.artifact.id) : "#"}>Download</a> : "Metadata-only"}</td><td><StatusPill status={row.artifact.status} /></td></tr>)}</DataTable>{snapshot.artifacts.length === 0 && <EmptyState icon={Icon} title={`${snapshot.recoveryJobs.length} recovery job(s) returned`} detail="No persisted recovered candidates are available. Results are never fabricated in the console." />}</>
+        : page === "acquisition"
+          ? <DataTable columns={["JOB", "SOURCE", "STATUS", "SHA-256", "SIZE", "CREATED"]}>{snapshot.acquisitions.map((job) => <tr key={job.id}><td className="mono">{job.id}</td><td>{job.sourceType} · {job.sourceIdentifier}</td><td><StatusPill status={job.status} /></td><td className="mono muted-cell">{job.sha256 || "—"}</td><td>{job.size ?? "—"}</td><td className="muted-cell">{formatDate(job.createdAt)}</td></tr>)}</DataTable>
           : page === "sanitization"
-            ? <EmptyState icon={Icon} title={`${snapshot.sanitizationJobs.length} sanitization job(s) returned`} detail="Sanitization records are available; execution remains subject to backend authorization and service readiness." />
+            ? <DataTable columns={["JOB", "TARGET", "METHOD", "STATUS", "VERIFICATION", "CREATED"]}>{snapshot.sanitizationJobs.map((job) => <tr key={job.id}><td className="mono">{job.id}</td><td>{job.targetType} · {job.targetReference}</td><td>{job.sanitizationMethod}</td><td><StatusPill status={job.status} /></td><td className="mono">{job.verificationHash || job.verificationStatus || "—"}</td><td className="muted-cell">{formatDate(job.createdAt)}</td></tr>)}</DataTable>
             : <EmptyState icon={Icon} title="No operation records" detail="No backend records are available for this stage." />;
   return <div className="page-stack"><PageHeader eyebrow="AUTHORIZED WORKFLOW" title={title} description="Live operation records only; no client-side execution is simulated." actions={<StatusPill status={snapshot.user.role === "ADMIN" ? "ADMIN SESSION" : "ASSIGNED ACCESS"} />} /><section className="panel workspace-main"><div className="workspace-banner"><div className="workspace-stage-icon"><Icon size={22} /></div><div><span>BACKEND RECORDS</span><strong>{title.toUpperCase()}</strong><small>{snapshot.investigations[0] ? snapshot.investigations[0].investigationNumber : "No investigation selected"}</small></div></div>{content}</section></div>;
 }
 
 function AppConsole({ role, onLogout }: { role: Exclude<Role, "gateway">; onLogout: () => void }) {
   const [page, setPage] = useState<PageKey>("dashboard");
-  const [snapshot, setSnapshot] = useState<BackendSnapshot>({ user: { id: "", email: "", name: "", role: role === "administrator" ? "ADMIN" : "INVESTIGATOR" }, health: null, investigations: [], investigators: [], authorizations: [], devices: [], workflow: null, acquisitions: [], workingCopies: [], recoveryJobs: [], certificates: [], sanitizationJobs: [], unavailable: [], loading: true, error: null });
+  const [snapshot, setSnapshot] = useState<BackendSnapshot>({ user: { id: "", email: "", name: "", role: role === "administrator" ? "ADMIN" : "INVESTIGATOR" }, health: null, investigations: [], investigators: [], authorizations: [], devices: [], workflow: null, acquisitions: [], workingCopies: [], recoveryJobs: [], certificates: [], sanitizationJobs: [], evidence: [], artifacts: [], auditEvents: [], analysisJobs: [], unavailable: [], loading: true, error: null });
   const isAdmin = role === "administrator";
 
   useEffect(() => {
@@ -505,7 +541,7 @@ function AppConsole({ role, onLogout }: { role: Exclude<Role, "gateway">; onLogo
             throw error;
           }
         };
-        const [healthResult, investigatorsResult, authorizationsResult, devicesResult, workflowResult, acquisitionsResult, workingCopiesResult, recoveryJobsResult, certificatesResult, sanitizationJobsResult] = await Promise.all([
+        const [healthResult, investigatorsResult, authorizationsResult, devicesResult, workflowResult, acquisitionsResult, workingCopiesResult, recoveryJobsResult, certificatesResult, sanitizationJobsResult, evidenceResult, artifactsResult, auditEventsResult, analysisJobsResult] = await Promise.all([
           optional("health", getHealth, null),
           isAdmin ? optional("investigators", listInvestigators, { investigators: [] }) : Promise.resolve({ investigators: [] }),
           isAdmin ? optional("authorizations", () => listAuthorizations(), { authorizations: [] }) : Promise.resolve({ authorizations: [] }),
@@ -516,9 +552,13 @@ function AppConsole({ role, onLogout }: { role: Exclude<Role, "gateway">; onLogo
           activeInvestigationId ? optional("recovery jobs", () => listRecoveryJobs(activeInvestigationId), { recoveryJobs: [] }) : Promise.resolve({ recoveryJobs: [] }),
           activeInvestigationId ? optional("recovery certificates", () => listRecoveryCertificates(activeInvestigationId), { certificates: [] }) : Promise.resolve({ certificates: [] }),
           activeInvestigationId ? optional("sanitization", () => listSanitizationJobs(activeInvestigationId), { sanitizationJobs: [] }) : Promise.resolve({ sanitizationJobs: [] }),
+          activeInvestigationId ? optional("evidence", () => listEvidence(activeInvestigationId), { evidence: [] }) : Promise.resolve({ evidence: [] }),
+          activeInvestigationId ? optional("recovered artifacts", () => listRecoveredArtifacts(activeInvestigationId), { artifacts: [] }) : Promise.resolve({ artifacts: [] }),
+          activeInvestigationId ? optional("audit events", () => listAuditEvents(activeInvestigationId), { auditEvents: [] }) : Promise.resolve({ auditEvents: [] }),
+          activeInvestigationId ? optional("analysis jobs", () => listAnalysisJobs(activeInvestigationId), { analysisJobs: [] }) : Promise.resolve({ analysisJobs: [] }),
         ]);
         if (!active) return;
-        setSnapshot({ user: userResult.user, health: healthResult, investigations: investigationsResult.investigations, investigators: investigatorsResult.investigators, authorizations: authorizationsResult.authorizations, devices: devicesResult.devices, workflow: workflowResult.workflow, acquisitions: acquisitionsResult.acquisitions, workingCopies: workingCopiesResult.workingCopies, recoveryJobs: recoveryJobsResult.recoveryJobs, certificates: certificatesResult.certificates, sanitizationJobs: sanitizationJobsResult.sanitizationJobs, unavailable, loading: false, error: null });
+        setSnapshot({ user: userResult.user, health: healthResult, investigations: investigationsResult.investigations, investigators: investigatorsResult.investigators, authorizations: authorizationsResult.authorizations, devices: devicesResult.devices, workflow: workflowResult.workflow, acquisitions: acquisitionsResult.acquisitions, workingCopies: workingCopiesResult.workingCopies, recoveryJobs: recoveryJobsResult.recoveryJobs, certificates: certificatesResult.certificates, sanitizationJobs: sanitizationJobsResult.sanitizationJobs, evidence: evidenceResult.evidence, artifacts: artifactsResult.artifacts, auditEvents: auditEventsResult.auditEvents, analysisJobs: analysisJobsResult.analysisJobs, unavailable, loading: false, error: null });
       } catch (error) {
         if (active) setSnapshot((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : "Unable to load the authenticated backend session." }));
       }
@@ -537,7 +577,7 @@ function AppConsole({ role, onLogout }: { role: Exclude<Role, "gateway">; onLogo
   const renderPage = () => {
     if (page === "dashboard") return isAdmin ? <AdminDashboard onNavigate={navigate} snapshot={snapshot} /> : <InvestigatorDashboard onNavigate={navigate} snapshot={snapshot} />;
     if (page === "investigations") return <InvestigationsPage snapshot={snapshot} canCreate={isAdmin} />;
-    if (page === "evidence") return <EvidencePage />;
+    if (page === "evidence") return <EvidencePage snapshot={snapshot} />;
     if (page === "devices") return <DevicesPage snapshot={snapshot} />;
     if (page === "assignment") return isAdmin ? <AssignmentPage snapshot={snapshot} /> : <InvestigatorDashboard onNavigate={navigate} snapshot={snapshot} />;
     if (page === "investigators") return <InvestigatorsPage snapshot={snapshot} />;

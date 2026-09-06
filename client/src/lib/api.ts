@@ -154,6 +154,22 @@ export type SanitizationJob = {
   updatedAt: string;
 };
 
+export type EvidenceRecord = {
+  evidence: { id: string; investigationId: string; deviceId?: string | null; acquisitionJobId: string; masterStorageObjectId: string; sha256: string; size: number; status: string; createdAt: string };
+  storageObject: { id: string; bucket: string; objectKey: string; originalFilename: string; fileSizeBytes: number; sha256: string; status: string; deletionPolicy: string; createdAt: string };
+  device?: Device | null;
+};
+
+export type RecoveredArtifact = {
+  artifact: { id: string; investigationId: string; recoveryJobId: string; workingCopyId: string; masterEvidenceId: string; method: string; engine: string; sourcePath?: string | null; size?: number | null; storageObjectId?: string | null; provisionalSha256?: string | null; status: string; provenance: Record<string, unknown>; createdAt: string };
+  recoveryJob: RecoveryJob;
+  workingCopy: WorkingCopy;
+  storageObject?: { id: string; originalFilename: string; fileSizeBytes: number; sha256: string; status: string } | null;
+};
+
+export type AuditEvent = { auditEvent: { id: string; investigationId?: string | null; eventType: string; result: string; details?: string | null; createdAt: string }; actor?: { id: string; name: string; role: ApiRole } | null };
+export type AnalysisJob = { id: string; investigationId: string; requestedBy: string; validationCertificateId: string; workingCopyId: string; status: string; inputSha256?: string | null; resultStorageObjectId?: string | null; outputSha256?: string | null; errorMessage?: string | null; startedAt?: string | null; completedAt?: string | null; createdAt: string; updatedAt: string };
+
 export type ApiResult<T> = { data: T; unavailable?: boolean; error?: string };
 
 let accessToken: string | null = null;
@@ -240,6 +256,10 @@ export async function listDevices(investigationId: string) {
   return request<{ devices: Device[] }>(`/investigations/${investigationId}/devices`);
 }
 
+export async function createDevice(investigationId: string, input: { deviceIdentifier: string; deviceType: string; manufacturer?: string; model?: string; serialNumber?: string; capacity?: string; connectionType?: string; status?: Device["status"] }) {
+  return request<{ device: Device }>(`/investigations/${investigationId}/devices`, { method: "POST", body: JSON.stringify(input) });
+}
+
 export async function getWorkflow(investigationId: string) {
   return request<{ workflow: Workflow }>(`/investigations/${investigationId}/workflow`);
 }
@@ -284,4 +304,44 @@ export async function startAnalysis(investigationId: string) {
 
 export async function listSanitizationJobs(investigationId: string) {
   return request<{ sanitizationJobs: SanitizationJob[] }>(`/investigations/${investigationId}/sanitization/jobs`);
+}
+
+export async function listEvidence(investigationId: string) {
+  return request<{ evidence: EvidenceRecord[] }>(`/investigations/${investigationId}/evidence`);
+}
+
+export async function getEvidence(investigationId: string, evidenceId: string) {
+  return request<{ evidence: EvidenceRecord }>(`/investigations/${investigationId}/evidence/${evidenceId}`);
+}
+
+export async function listRecoveredArtifacts(investigationId: string) {
+  return request<{ artifacts: RecoveredArtifact[] }>(`/investigations/${investigationId}/recovered-artifacts`);
+}
+
+export async function listAuditEvents(investigationId: string) {
+  return request<{ auditEvents: AuditEvent[] }>(`/investigations/${investigationId}/audit-events`);
+}
+
+export async function listCustody(investigationId: string) {
+  return request<{ audit: AuditEvent[]; ledger: unknown[]; analysis: AnalysisJob[] }>(`/investigations/${investigationId}/custody`);
+}
+
+export async function validateCertificate(investigationId: string, certificateId: string) {
+  return request<{ certificate: RecoveryCertificate }>(`/investigations/${investigationId}/certificates/${certificateId}/validate`, { method: "POST", body: JSON.stringify({}) });
+}
+
+export async function rejectCertificate(investigationId: string, certificateId: string, reason: string) {
+  return request<{ certificate: RecoveryCertificate }>(`/investigations/${investigationId}/certificates/${certificateId}/reject`, { method: "POST", body: JSON.stringify({ reason }) });
+}
+
+export async function listAnalysisJobs(investigationId: string) {
+  return request<{ analysisJobs: AnalysisJob[] }>(`/investigations/${investigationId}/analysis/jobs`);
+}
+
+export async function createAnalysisJob(investigationId: string, validationCertificateId: string) {
+  return request<{ analysisJob: AnalysisJob }>(`/investigations/${investigationId}/analysis/jobs`, { method: "POST", body: JSON.stringify({ validationCertificateId }) });
+}
+
+export function recoveredArtifactDownloadUrl(investigationId: string, artifactId: string) {
+  return `/api/investigations/${investigationId}/recovered-artifacts/${artifactId}/download`;
 }
