@@ -76,6 +76,7 @@ import {
   listRecoveryJobs,
   listRecoveryCertificates,
   listSanitizationJobs,
+  saveWorkflow,
   startAnalysis as apiStartAnalysis,
 } from "@/lib/api";
 
@@ -326,6 +327,13 @@ function investigationLabel(snapshot: BackendSnapshot, id?: string | null) {
   return snapshot.investigations.find((item) => item.id === id)?.investigationNumber || id || "—";
 }
 
+function selectActiveInvestigation(investigations: Investigation[]) {
+  return investigations.find((item) => item.status === "IN_PROGRESS")
+    || investigations.find((item) => item.status === "OPEN")
+    || investigations.find((item) => item.status !== "ARCHIVED" && item.status !== "CLOSED")
+    || investigations[0];
+}
+
 function AdminDashboard({ onNavigate, snapshot }: { onNavigate: (page: PageKey) => void; snapshot: BackendSnapshot }) {
   if (snapshot.loading || snapshot.error) return <div className="page-stack"><PageHeader eyebrow="SYSTEM OVERVIEW" title="Control center" description="Live state from the FORENSIC-X backend." /><ConsoleState snapshot={snapshot} /></div>;
   const pending = snapshot.authorizations.filter((item) => item.status === "PENDING").length;
@@ -352,9 +360,28 @@ function DevicesPage({ snapshot }: { snapshot: BackendSnapshot }) {
 }
 
 function AssignmentPage({ snapshot }: { snapshot: BackendSnapshot }) {
-  const selectedCase = snapshot.investigations[0];
+  const selectedCase = selectActiveInvestigation(snapshot.investigations);
   const workflow = snapshot.workflow;
+  const [assignments, setAssignments] = useState({ acquisitionInvestigatorId: workflow?.acquisitionInvestigatorId || "", recoveryInvestigatorId: workflow?.recoveryInvestigatorId || "", validationInvestigatorId: workflow?.validationInvestigatorId || "", analysisInvestigatorId: workflow?.analysisInvestigatorId || "" });
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    setAssignments({ acquisitionInvestigatorId: workflow?.acquisitionInvestigatorId || "", recoveryInvestigatorId: workflow?.recoveryInvestigatorId || "", validationInvestigatorId: workflow?.validationInvestigatorId || "", analysisInvestigatorId: workflow?.analysisInvestigatorId || "" });
+  }, [workflow]);
   const rows = workflow ? [["ACQUISITION", workflow.acquisitionInvestigatorId], ["RECOVERY", workflow.recoveryInvestigatorId], ["VALIDATION", workflow.validationInvestigatorId], ["ANALYSIS", workflow.analysisInvestigatorId]] : [];
+  const updateAssignment = (stage: keyof typeof assignments, value: string) => setAssignments((current) => ({ ...current, [stage]: value }));
+  const configure = async () => {
+    if (!selectedCase || Object.values(assignments).some((value) => !value)) return;
+    setSaving(true);
+    try {
+      await saveWorkflow(selectedCase.id, assignments);
+      toast("Workflow configuration saved by backend.");
+      window.location.reload();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Workflow configuration failed.");
+    } finally {
+      setSaving(false);
+    }
+  };
   const workflowContent = workflow
     ? <DataTable columns={["STAGE", "ASSIGNED INVESTIGATOR", "VERSION", "UPDATED"]}>{rows.map(([stage, investigator]) => <tr key={stage}><td><span className="stage-chip">{stage}</span></td><td className="mono">{investigator}</td><td>{workflow.version}</td><td className="muted-cell">{formatDate(workflow.updatedAt)}</td></tr>)}</DataTable>
     : <UnavailableState feature="Workflow assignment" detail={selectedCase ? "No workflow record was returned for the selected investigation." : "The backend returned no investigations to select."} />;
@@ -363,6 +390,7 @@ function AssignmentPage({ snapshot }: { snapshot: BackendSnapshot }) {
     <section className="panel">
       <SectionHeader label="CONTROLLED WORKFLOW" meta={selectedCase ? selectedCase.id : "NO CASE SELECTED"} />
       {workflowContent}
+      {selectedCase && snapshot.investigators.length > 0 && <div className="workflow-config-form"><div className="mini-heading">CONFIGURE ASSIGNMENTS</div>{([['acquisitionInvestigatorId', 'ACQUISITION'], ['recoveryInvestigatorId', 'RECOVERY'], ['validationInvestigatorId', 'VALIDATION'], ['analysisInvestigatorId', 'ANALYSIS']] as const).map(([stage, label]) => <label key={stage}>{label}<select value={assignments[stage]} onChange={(event) => updateAssignment(stage, event.target.value)}><option value="">Select investigator</option>{snapshot.investigators.map((investigator) => <option key={investigator.id} value={investigator.id}>{investigator.name} ({investigator.id})</option>)}</select></label>)}<button className="primary-button" disabled={saving || Object.values(assignments).some((value) => !value)} onClick={() => void configure()}>{saving ? "Saving…" : "Save workflow configuration"}</button></div>}
       <div className="context-note"><ShieldCheck size={15} /><span>Assignment changes are governed by the existing admin-only workflow endpoint; this view does not invent client-side permissions.</span></div>
     </section>
   </div>;
@@ -433,7 +461,7 @@ function AppConsole({ role, onLogout }: { role: Exclude<Role, "gateway">; onLogo
       try {
         const userResult = await getCurrentUser();
         const investigationsResult = await listInvestigations();
-        const activeInvestigationId = investigationsResult.investigations.find((investigation) => Boolean(investigation.id))?.id;
+        const activeInvestigationId = selectActiveInvestigation(investigationsResult.investigations)?.id;
         const unavailable: string[] = [];
         const optional = async <T,>(label: string, task: () => Promise<T>, emptyValue: T) => {
           try { return await task(); } catch (error) {
