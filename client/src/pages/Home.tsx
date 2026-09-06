@@ -334,12 +334,26 @@ function selectActiveInvestigation(investigations: Investigation[]) {
     || investigations[0];
 }
 
+function ForensicPipeline() {
+  const stages = [
+    ["SOURCE", "Physical evidence"],
+    ["ACQUISITION", "Authorized capture"],
+    ["MASTER IMAGE", "Protected original"],
+    ["WORKING COPY", "Controlled workspace"],
+    ["RECOVERY", "Artifact processing"],
+    ["VALIDATION", "Independent review"],
+    ["ANALYSIS", "Authorized examination"],
+  ];
+  return <section className="panel pipeline-panel"><SectionHeader label="FORENSIC OPERATING MODEL" meta="CONTROLLED EVIDENCE PATH" /><div className="pipeline-intro"><div><strong>One source. One protected master.</strong><span>Investigators operate on controlled working copies and independent validation gates analysis.</span></div><span className="pipeline-note"><ShieldCheck size={14} /> SEPARATION OF DUTIES ENFORCED</span></div><div className="forensic-pipeline">{stages.map(([label, detail], index) => <div className="pipeline-stage" key={label}><div className="pipeline-node"><span>{String(index + 1).padStart(2, "0")}</span></div><div><strong>{label}</strong><small>{detail}</small></div>{index < stages.length - 1 && <ChevronRight className="pipeline-arrow" size={15} />}</div>)}</div></section>;
+}
+
 function AdminDashboard({ onNavigate, snapshot }: { onNavigate: (page: PageKey) => void; snapshot: BackendSnapshot }) {
   if (snapshot.loading || snapshot.error) return <div className="page-stack"><PageHeader eyebrow="SYSTEM OVERVIEW" title="Control center" description="Live state from the FORENSIC-X backend." /><ConsoleState snapshot={snapshot} /></div>;
   const pending = snapshot.authorizations.filter((item) => item.status === "PENDING").length;
   return <div className="page-stack dashboard-page">
     <PageHeader eyebrow="SYSTEM OVERVIEW / LIVE BACKEND" title="Control center" description="Operational state across investigations, access, devices and controlled workflow." actions={<><button className="secondary-button" onClick={() => window.location.reload()}><RefreshCw size={15} /> Refresh</button><button className="primary-button" onClick={() => onNavigate("authorizations")}><ListChecks size={15} /> Review requests <span className="button-count">{pending}</span></button></>} />
     <div className="stat-grid"><StatCard label="INVESTIGATIONS" value={String(snapshot.investigations.length).padStart(2, "0")} sub="Returned by backend" icon={BriefcaseBusiness} tone="cyan" /><StatCard label="MASTER EVIDENCE" value="—" sub="No list endpoint exposed" icon={Boxes} tone="violet" /><StatCard label="INVESTIGATORS" value={String(snapshot.investigators.length).padStart(2, "0")} sub="Backend user registry" icon={Users} tone="green" /><StatCard label="PENDING APPROVALS" value={String(pending).padStart(2, "0")} sub="Authorization requests" icon={CircleAlert} tone="amber" /></div>
+    <ForensicPipeline />
     <div className="dashboard-grid-primary"><section className="panel service-panel"><SectionHeader label="SYSTEM SERVICES" meta={snapshot.health?.status === "ok" ? "API ONLINE" : "UNAVAILABLE"} action={<button className="panel-action" onClick={() => onNavigate("system")}>VIEW STATUS <ArrowUpRight size={13} /></button>} /><div className="service-list"><div className="service-row"><div className="service-icon"><Server size={16} /></div><div className="service-name"><strong>FORENSIC-X API</strong><span>{snapshot.health?.service || "health endpoint unavailable"}</span></div><div className="service-status"><StatusDot tone={snapshot.health?.status === "ok" ? "green" : "red"} pulse /><span>{snapshot.health?.status === "ok" ? "OPERATIONAL" : "UNAVAILABLE"}</span></div></div><div className="service-row"><div className="service-icon"><Database size={16} /></div><div className="service-name"><strong>Evidence registry</strong><span>Listing endpoint is not exposed</span></div><div className="service-status"><StatusDot tone="amber" /><span>UNAVAILABLE</span></div></div></div></section><section className="panel workflow-panel"><SectionHeader label="WORKFLOW STATE" meta="LIVE RECORDS" /><div className="throughput-total"><span>{snapshot.acquisitions.length + snapshot.recoveryJobs.length}</span><span>tracked operation jobs</span><StatusPill status="BACKEND" /></div><div className="workflow-summary"><div><span>WORKING COPIES</span><strong>{snapshot.workingCopies.length}</strong></div><div><span>RECOVERY CERTIFICATES</span><strong>{snapshot.certificates.length}</strong></div><div><span>SANITIZATION JOBS</span><strong>{snapshot.sanitizationJobs.length}</strong></div></div></section></div>
     <section className="panel"><SectionHeader label="ACTIVE INVESTIGATIONS" meta="BACKEND REGISTER" action={<button className="panel-action" onClick={() => onNavigate("investigations")}>VIEW ALL <ArrowUpRight size={13} /></button>} /><DataTable columns={["CASE ID", "TITLE", "STATUS", "CREATED", "CREATED BY"]}>{snapshot.investigations.map((item) => <tr key={item.id}><td><span className="mono emphasis">{item.investigationNumber}</span></td><td><strong>{item.title}</strong><span className="cell-sub">{item.id}</span></td><td><StatusPill status={item.status} /></td><td className="muted-cell">{formatDate(item.createdAt)}</td><td><span className="mono">{item.createdBy}</span></td></tr>)}</DataTable>{snapshot.investigations.length === 0 && <EmptyState icon={BriefcaseBusiness} title="No investigations returned" detail="Create an investigation through the backend before using this workspace." />}</section>
   </div>;
@@ -386,7 +400,7 @@ function AssignmentPage({ snapshot }: { snapshot: BackendSnapshot }) {
     }
   };
   const workflowContent = workflow
-    ? <DataTable columns={["STAGE", "ASSIGNED INVESTIGATOR", "VERSION", "UPDATED"]}>{rows.map(([stage, investigator]) => <tr key={stage}><td><span className="stage-chip">{stage}</span></td><td className="mono">{investigator}</td><td>{workflow.version}</td><td className="muted-cell">{formatDate(workflow.updatedAt)}</td></tr>)}</DataTable>
+    ? <DataTable columns={["STAGE", "ASSIGNED INVESTIGATOR", "VERSION", "UPDATED"]}>{rows.map(([stage, investigator]) => { const person = snapshot.investigators.find((item) => item.id === investigator); return <tr key={stage}><td><span className="stage-chip">{stage}</span></td><td><strong>{person?.name || "Investigator record unavailable"}</strong><span className="cell-sub mono">{investigator}</span></td><td>{workflow.version}</td><td className="muted-cell">{formatDate(workflow.updatedAt)}</td></tr>; })}</DataTable>
     : <EmptyState icon={ShieldCheck} title="WORKFLOW NOT CONFIGURED" detail={selectedCase ? "Assign eligible investigators below to create the persisted workflow for this investigation." : "The backend returned no investigations to select."} />;
   return <div className="page-stack">
     <PageHeader eyebrow="WORKFLOW CONTROL / LIVE ASSIGNMENT" title="Task assignment" description="The backend exposes one workflow record per investigation with four assigned stages." actions={selectedCase ? <div className="assignment-case-select"><span>CASE</span><strong>{selectedCase.investigationNumber}</strong></div> : undefined} />
