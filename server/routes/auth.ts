@@ -1,12 +1,13 @@
 import { Router, type Response } from "express";
 import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const";
-import { bootstrapAdminSchema, createUserSchema, loginSchema } from "../../shared/schemas";
+import { bootstrapAdminSchema, createInvestigatorSchema, createUserSchema, idParamSchema, investigatorStatusSchema, investigatorUpdateSchema, loginSchema } from "../../shared/schemas";
 import { env } from "../config/env";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { eq } from "drizzle-orm";
 import { asyncHandler } from "../middleware/errorHandler";
 import { validate } from "../middleware/validate";
 import { bootstrapAdmin, createUserRecord, getUserById, login } from "../services/auth";
+import { createInvestigator, getInvestigator, listInvestigators, updateInvestigator, updateInvestigatorStatus } from "../services/investigators";
 
 export const authRouter = Router();
 
@@ -66,16 +67,19 @@ const listInvestigatorsForAdmin = asyncHandler(async (_req, res) => {
     res.json({ users: rows.map((r: any) => ({ id: r.id, name: r.name })) });
   });
 
-authRouter.get(
-  "/admin/users",
-  requireAuth,
-  requireRole("ADMIN"),
-  listInvestigatorsForAdmin,
-);
-
-authRouter.get(
-  "/admin/investigators",
-  requireAuth,
-  requireRole("ADMIN"),
-  listInvestigatorsForAdmin,
-);
+authRouter.get("/admin/users", requireAuth, requireRole("ADMIN"), listInvestigatorsForAdmin);
+authRouter.post("/admin/investigators", requireAuth, requireRole("ADMIN"), validate(createInvestigatorSchema), asyncHandler(async (req, res) => {
+  res.status(201).json({ investigator: await createInvestigator(req.body) });
+}));
+authRouter.get("/admin/investigators", requireAuth, requireRole("ADMIN"), asyncHandler(async (_req, res) => {
+  res.json({ investigators: await listInvestigators() });
+}));
+authRouter.get("/admin/investigators/:id", requireAuth, requireRole("ADMIN"), validate(idParamSchema, "params"), asyncHandler(async (req, res) => {
+  res.json({ investigator: await getInvestigator(req.params.id) });
+}));
+authRouter.put("/admin/investigators/:id", requireAuth, requireRole("ADMIN"), validate(idParamSchema, "params"), validate(investigatorUpdateSchema), asyncHandler(async (req, res) => {
+  res.json({ investigator: await updateInvestigator(req.params.id, req.body) });
+}));
+authRouter.patch("/admin/investigators/:id/status", requireAuth, requireRole("ADMIN"), validate(idParamSchema, "params"), validate(investigatorStatusSchema), asyncHandler(async (req, res) => {
+  res.json({ investigator: await updateInvestigatorStatus(req.params.id, req.body.status) });
+}));

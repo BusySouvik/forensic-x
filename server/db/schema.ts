@@ -120,6 +120,7 @@ export const investigatorProfiles = pgTable("investigator_profiles", {
   designation: text("designation").notNull(),
   department: text("department").notNull(),
   specialization: text("specialization"),
+  status: text("status").notNull().default("ACTIVE"),
   joiningDate: timestamp("joining_date", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

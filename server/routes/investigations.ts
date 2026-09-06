@@ -17,8 +17,8 @@ export const investigationsRouter = Router();
 investigationsRouter.get(
   "/investigations",
   requireAuth,
-  asyncHandler(async (_req, res) => {
-    const items = await listInvestigations();
+  asyncHandler(async (req, res) => {
+    const items = await listInvestigations(req.user ? { id: req.user.sub, role: req.user.role } : undefined);
     res.json({ investigations: items });
   }),
 );
@@ -26,6 +26,7 @@ investigationsRouter.get(
 investigationsRouter.post(
   "/investigations",
   requireAuth,
+  requireRole("ADMIN"),
   validate(createInvestigationSchema),
   asyncHandler(async (req, res) => {
     const created = await createInvestigation({
@@ -41,7 +42,7 @@ investigationsRouter.get(
   requireAuth,
   validate(idParamSchema, "params"),
   asyncHandler(async (req, res) => {
-    const investigation = await getInvestigation(req.params.id);
+    const investigation = await getInvestigation(req.params.id, req.user ? { id: req.user.sub, role: req.user.role } : undefined);
     res.json({ investigation });
   }),
 );
@@ -49,6 +50,7 @@ investigationsRouter.get(
 investigationsRouter.patch(
   "/investigations/:id",
   requireAuth,
+  requireRole("ADMIN"),
   validate(idParamSchema, "params"),
   validate(updateInvestigationSchema),
   asyncHandler(async (req, res) => {

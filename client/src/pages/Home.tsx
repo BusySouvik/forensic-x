@@ -42,6 +42,7 @@ import {
   Sparkles,
   Terminal,
   UserCheck,
+  UserPlus,
   UserCog,
   Users,
   X,
@@ -52,6 +53,7 @@ import {
 import { toast } from "sonner";
 import {
   type ApiUser,
+  type Investigator,
   type Authorization,
   type Device,
   type Investigation,
@@ -64,6 +66,7 @@ import {
   getHealth,
   getCurrentUser,
   login as apiLogin,
+  createInvestigation,
   clearAccessToken,
   decideAuthorization,
   listAcquisitions,
@@ -71,6 +74,8 @@ import {
   listDevices,
   listInvestigations,
   listInvestigators,
+  createInvestigator,
+  updateInvestigatorStatus,
   getWorkflow,
   listWorkingCopies,
   listRecoveryJobs,
@@ -108,7 +113,7 @@ type BackendSnapshot = {
   user: ApiUser;
   health: { status: string; service: string; timestamp: string } | null;
   investigations: Investigation[];
-  investigators: Array<{ id: string; name: string }>;
+  investigators: Investigator[];
   authorizations: Authorization[];
   devices: Device[];
   workflow: Workflow | null;
@@ -359,10 +364,17 @@ function AdminDashboard({ onNavigate, snapshot }: { onNavigate: (page: PageKey) 
   </div>;
 }
 
-function InvestigationsPage({ snapshot }: { snapshot: BackendSnapshot }) {
+function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+  return <div className="modal-backdrop" role="presentation"><section className="modal-panel" role="dialog" aria-modal="true" aria-label={title}><div className="modal-header"><div><div className="page-eyebrow">ADMINISTRATION / CONTROLLED CHANGE</div><h2>{title}</h2></div><button className="icon-button" onClick={onClose} aria-label="Close dialog"><X size={17} /></button></div>{children}</section></div>;
+}
+
+function InvestigationsPage({ snapshot, canCreate = false }: { snapshot: BackendSnapshot; canCreate?: boolean }) {
   const [query, setQuery] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const rows = snapshot.investigations.filter((item) => `${item.investigationNumber} ${item.title} ${item.status}`.toLowerCase().includes(query.toLowerCase()));
-  return <div className="page-stack"><PageHeader eyebrow="CASE MANAGEMENT / LIVE REGISTER" title="Investigations" description="Investigation records returned by the existing backend." /><section className="panel"><div className="table-toolbar"><div className="search-field"><Search size={15} /><input placeholder="Search case number, title or status" value={query} onChange={(e) => setQuery(e.target.value)} /></div></div><DataTable columns={["CASE ID", "TITLE", "DESCRIPTION", "STATUS", "CREATED", "UPDATED"]}>{rows.map((item) => <tr key={item.id}><td><span className="mono emphasis">{item.investigationNumber}</span><span className="cell-sub">{item.id}</span></td><td><strong>{item.title}</strong></td><td className="muted-cell">{item.description || "—"}</td><td><StatusPill status={item.status} /></td><td className="muted-cell">{formatDate(item.createdAt)}</td><td className="muted-cell">{formatDate(item.updatedAt)}</td></tr>)}</DataTable>{rows.length === 0 && <EmptyState icon={BriefcaseBusiness} title="No matching investigations" detail="The backend returned no records for this filter." />}<div className="table-footer"><span>Showing {rows.length} of {snapshot.investigations.length} investigations</span></div></section></div>;
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = new FormData(event.currentTarget); setSaving(true); try { const created = await createInvestigation({ investigationNumber: String(form.get("investigationNumber")), title: String(form.get("title")), description: String(form.get("description") || ""), status: String(form.get("status")) as Investigation["status"] }); const assignment = { acquisitionInvestigatorId: String(form.get("acquisitionInvestigatorId") || ""), recoveryInvestigatorId: String(form.get("recoveryInvestigatorId") || ""), validationInvestigatorId: String(form.get("validationInvestigatorId") || ""), analysisInvestigatorId: String(form.get("analysisInvestigatorId") || "") }; if (Object.values(assignment).every(Boolean)) await saveWorkflow(created.investigation.id, assignment); toast(Object.values(assignment).every(Boolean) ? "Investigation and operational workflow persisted." : "Investigation created; workflow remains unconfigured."); setCreateOpen(false); window.location.reload(); } catch (error) { toast(error instanceof Error ? error.message : "Investigation creation failed."); } finally { setSaving(false); } };
+  return <div className="page-stack"><PageHeader eyebrow="CASE MANAGEMENT / LIVE REGISTER" title="Investigations" description="Investigation records returned by the existing backend." actions={canCreate ? <button className="primary-button" onClick={() => setCreateOpen(true)}><BriefcaseBusiness size={15} /> New investigation</button> : undefined} /><section className="panel"><div className="table-toolbar"><div className="search-field"><Search size={15} /><input placeholder="Search case number, title or status" value={query} onChange={(e) => setQuery(e.target.value)} /></div></div><DataTable columns={["CASE ID", "TITLE", "DESCRIPTION", "STATUS", "CREATED", "UPDATED"]}>{rows.map((item) => <tr key={item.id}><td><span className="mono emphasis">{item.investigationNumber}</span><span className="cell-sub">{item.id}</span></td><td><strong>{item.title}</strong></td><td className="muted-cell">{item.description || "—"}</td><td><StatusPill status={item.status} /></td><td className="muted-cell">{formatDate(item.createdAt)}</td><td className="muted-cell">{formatDate(item.updatedAt)}</td></tr>)}</DataTable>{rows.length === 0 && <EmptyState icon={BriefcaseBusiness} title="No matching investigations" detail="The backend returned no records for this filter." />}<div className="table-footer"><span>Showing {rows.length} of {snapshot.investigations.length} investigations</span></div></section>{createOpen && canCreate && <Modal title="Create investigation" onClose={() => setCreateOpen(false)}><form className="modal-form" onSubmit={submit}><label>CASE REFERENCE<input name="investigationNumber" placeholder="CASE-0042" required /></label><label>CASE TITLE<input name="title" placeholder="Digital evidence investigation" required /></label><label>DESCRIPTION<textarea name="description" placeholder="Operational context and scope" rows={4} /></label><label>INITIAL STATUS<select name="status" defaultValue="OPEN"><option value="OPEN">OPEN</option><option value="IN_PROGRESS">IN PROGRESS</option></select></label><div className="form-section-label">OPTIONAL OPERATIONAL WORKFLOW</div><div className="modal-select-grid">{([['acquisitionInvestigatorId', 'ACQUISITION'], ['recoveryInvestigatorId', 'RECOVERY'], ['validationInvestigatorId', 'VALIDATION'], ['analysisInvestigatorId', 'ANALYSIS']] as const).map(([name, label]) => <label key={name}>{label}<select name={name} defaultValue=""><option value="">Leave unconfigured</option>{snapshot.investigators.map((investigator) => <option key={investigator.id} value={investigator.id}>{investigator.name} · {investigator.investigatorId || investigator.id}</option>)}</select></label>)}</div><span className="field-help">Select all four to persist the workflow with this case. Recovery and Validation must be different investigators.</span><div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setCreateOpen(false)}>Cancel</button><button className="primary-button" disabled={saving}>{saving ? "Creating…" : "Create investigation"}</button></div></form></Modal>}</div>;
 }
 
 function EvidencePage() {
@@ -414,7 +426,10 @@ function AssignmentPage({ snapshot }: { snapshot: BackendSnapshot }) {
 }
 
 function InvestigatorsPage({ snapshot }: { snapshot: BackendSnapshot }) {
-  return <div className="page-stack"><PageHeader eyebrow="OPERATOR REGISTRY / ADMIN" title="Investigators" description="Investigator accounts returned by the existing administrator endpoint." /><section className="panel"><SectionHeader label="INVESTIGATOR REGISTRY" meta={`${snapshot.investigators.length} RETURNED`} /><DataTable columns={["USER ID", "NAME", "ROLE SOURCE"]}>{snapshot.investigators.map((investigator) => <tr key={investigator.id}><td><span className="mono emphasis">{investigator.id}</span></td><td><strong>{investigator.name}</strong></td><td className="muted-cell">GET /admin/investigators</td></tr>)}</DataTable>{snapshot.investigators.length === 0 && <EmptyState icon={Users} title="No investigators returned" detail="The administrator endpoint returned an empty registry." />}</section><section className="panel"><UnavailableState feature="Investigator profiles and clearance" detail="The repository contains investigator profile schema and creation validation, but no admin GET endpoint returns profile, clearance, session or task details." /></section></div>;
+  const [admitOpen, setAdmitOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = new FormData(event.currentTarget); setSaving(true); try { await createInvestigator({ name: String(form.get("name")), email: String(form.get("email")), password: String(form.get("password")), investigatorId: String(form.get("investigatorId")), contactNumber: String(form.get("contactNumber")), designation: String(form.get("designation")), department: String(form.get("department")), specialization: String(form.get("specialization") || "") }); toast("Investigator admitted by backend."); setAdmitOpen(false); window.location.reload(); } catch (error) { toast(error instanceof Error ? error.message : "Investigator admission failed."); } finally { setSaving(false); } };
+  return <div className="page-stack"><PageHeader eyebrow="OPERATOR REGISTRY / ADMIN" title="Investigators" description="Investigator accounts and professional identity records returned by the backend." actions={<button className="primary-button" onClick={() => setAdmitOpen(true)}><UserPlus size={15} /> Admit investigator</button>} /><section className="panel"><SectionHeader label="INVESTIGATOR REGISTRY" meta={`${snapshot.investigators.length} RETURNED`} /><DataTable columns={["INVESTIGATOR", "PROFESSIONAL ID", "UNIT / DESIGNATION", "STATUS", "CONTROL"]}>{snapshot.investigators.map((investigator) => <tr key={investigator.id}><td><strong>{investigator.name}</strong><span className="cell-sub">{investigator.email}</span></td><td><span className="mono emphasis">{investigator.investigatorId || "Profile not configured"}</span></td><td><strong>{investigator.department || "—"}</strong><span className="cell-sub">{investigator.designation || "—"}</span></td><td><StatusPill status={investigator.status || "UNKNOWN"} /></td><td><select className="status-select" value={investigator.status || "ACTIVE"} onChange={async (event) => { try { await updateInvestigatorStatus(investigator.id, event.target.value as "ACTIVE" | "INACTIVE" | "ON_LEAVE"); toast("Investigator status updated."); window.location.reload(); } catch (error) { toast(error instanceof Error ? error.message : "Status update failed."); } }}><option value="ACTIVE">ACTIVE</option><option value="ON_LEAVE">ON LEAVE</option><option value="INACTIVE">INACTIVE</option></select></td></tr>)}</DataTable>{snapshot.investigators.length === 0 && <EmptyState icon={Users} title="No investigators returned" detail="Admit an investigator through the Admin control to create a real account and professional profile." />}</section>{admitOpen && <Modal title="Investigator admission" onClose={() => setAdmitOpen(false)}><form className="modal-form" onSubmit={submit}><div className="form-section-label">IDENTITY</div><label>FULL NAME<input name="name" required /></label><label>INVESTIGATOR ID<input name="investigatorId" placeholder="INV-0042" required /></label><label>OFFICIAL EMAIL<input name="email" type="email" required /></label><label>CONTACT NUMBER<input name="contactNumber" required /></label><div className="form-section-label">PROFESSIONAL INFORMATION</div><label>DESIGNATION<input name="designation" required /></label><label>DEPARTMENT / UNIT<input name="department" required /></label><label>SPECIALIZATION<input name="specialization" /></label><div className="form-section-label">INITIAL CREDENTIAL</div><label>TEMPORARY PASSWORD<input name="password" type="password" minLength={8} autoComplete="new-password" required /><span className="field-help">Hashed server-side; the role is fixed to INVESTIGATOR.</span></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setAdmitOpen(false)}>Cancel</button><button className="primary-button" disabled={saving}>{saving ? "Admitting…" : "Admit investigator"}</button></div></form></Modal>}</div>;
 }
 
 function AuthorizationsPage({ snapshot }: { snapshot: BackendSnapshot }) {
@@ -434,7 +449,7 @@ function AuthorizationsPage({ snapshot }: { snapshot: BackendSnapshot }) {
 function GovernancePage({ page, snapshot }: { page: PageKey; snapshot: BackendSnapshot }) {
   if (page === "system") return <div className="page-stack"><PageHeader eyebrow="SYSTEM / HEALTH ENDPOINT" title="System status" description="Only health information exposed by the backend is shown." /><section className="panel"><DataTable columns={["SERVICE", "STATUS", "TIMESTAMP"]}><tr><td>{snapshot.health?.service || "forensic-x"}</td><td><StatusPill status={snapshot.health?.status === "ok" ? "OPERATIONAL" : "UNAVAILABLE"} /></td><td className="muted-cell">{formatDate(snapshot.health?.timestamp)}</td></tr></DataTable></section></div>;
   const labels: Record<string, string> = { custody: "Chain of custody", ledger: "Blockchain ledger", audit: "Audit log", agent: "Forensic agent" };
-  return <div className="page-stack"><PageHeader eyebrow="FORENSIC GOVERNANCE" title={labels[page] || "Governance"} description="This screen is intentionally explicit about backend coverage." /><section className="panel"><UnavailableState feature={labels[page] || "Governance feature"} detail="This feature is not exposed by the current backend. No custody events, audit rows, ledger blocks or blockchain verification are fabricated." /></section></div>;
+  return <div className="page-stack"><PageHeader eyebrow="FORENSIC GOVERNANCE" title={labels[page] || "Governance"} description="Operational records are shown only when returned by the authoritative service." /><section className="panel"><UnavailableState feature={labels[page] || "Governance feature"} detail="No operational records are currently available from the authoritative service. The console will not infer custody events, audit rows, ledger blocks or blockchain verification." /></section></div>;
 }
 
 function InvestigatorDashboard({ snapshot, onNavigate }: { snapshot: BackendSnapshot; onNavigate: (page: PageKey) => void }) {
@@ -454,15 +469,15 @@ function TaskWorkspace({ page, snapshot }: { page: PageKey; snapshot: BackendSna
     catch (error) { setActionState("error"); toast(error instanceof Error ? error.message : "Analysis start failed."); }
   };
   const content = page === "analysis"
-    ? <div className="workspace-actions"><button className="primary-button" disabled={!investigationId || actionState === "running"} onClick={runAnalysis}><ArrowDownToLine size={15} /> {actionState === "running" ? "Starting…" : "Start authorized analysis"}</button><UnavailableState feature="Analysis results" detail="The backend exposes the start action but no analysis-result listing endpoint." /></div>
+    ? <div className="workspace-actions"><button className="primary-button" disabled={!investigationId || actionState === "running"} onClick={runAnalysis}><ArrowDownToLine size={15} /> {actionState === "running" ? "Starting…" : "Start authorized analysis"}</button><UnavailableState feature="Analysis results" detail="Analysis can be initiated when authorized; no result records are currently available from the service." /></div>
     : page === "validation"
-      ? <UnavailableState feature="Validation queue" detail="The backend exposes certificate validation actions but no validation queue listing endpoint." />
+      ? <UnavailableState feature="Validation queue" detail="No validation queue records are currently available from the authoritative service." />
       : page === "acquisition"
         ? <EmptyState icon={Icon} title={`${snapshot.acquisitions.length} acquisition job(s) returned`} detail="Use the backend request schema with an approved acquisition authorization; no acquisition is started from fabricated UI state." />
         : page === "recovery"
           ? <EmptyState icon={Icon} title={`${snapshot.recoveryJobs.length} recovery job(s) returned`} detail="Recovery results are explicitly pending validation until the backend returns authoritative artifacts." />
           : page === "sanitization"
-            ? <EmptyState icon={Icon} title={`${snapshot.sanitizationJobs.length} sanitization job(s) returned`} detail="The sanitization router is not mounted in the API index, so execution is unavailable from this frontend." />
+            ? <EmptyState icon={Icon} title={`${snapshot.sanitizationJobs.length} sanitization job(s) returned`} detail="Sanitization records are available; execution remains subject to backend authorization and service readiness." />
             : <EmptyState icon={Icon} title="No operation records" detail="No backend records are available for this stage." />;
   return <div className="page-stack"><PageHeader eyebrow="AUTHORIZED WORKFLOW" title={title} description="Live operation records only; no client-side execution is simulated." actions={<StatusPill status={snapshot.user.role === "ADMIN" ? "ADMIN SESSION" : "ASSIGNED ACCESS"} />} /><section className="panel workspace-main"><div className="workspace-banner"><div className="workspace-stage-icon"><Icon size={22} /></div><div><span>BACKEND RECORDS</span><strong>{title.toUpperCase()}</strong><small>{snapshot.investigations[0] ? snapshot.investigations[0].investigationNumber : "No investigation selected"}</small></div></div>{content}</section></div>;
 }
@@ -492,7 +507,7 @@ function AppConsole({ role, onLogout }: { role: Exclude<Role, "gateway">; onLogo
         };
         const [healthResult, investigatorsResult, authorizationsResult, devicesResult, workflowResult, acquisitionsResult, workingCopiesResult, recoveryJobsResult, certificatesResult, sanitizationJobsResult] = await Promise.all([
           optional("health", getHealth, null),
-          isAdmin ? optional("investigators", listInvestigators, { users: [] }) : Promise.resolve({ users: [] }),
+          isAdmin ? optional("investigators", listInvestigators, { investigators: [] }) : Promise.resolve({ investigators: [] }),
           isAdmin ? optional("authorizations", () => listAuthorizations(), { authorizations: [] }) : Promise.resolve({ authorizations: [] }),
           activeInvestigationId ? optional("devices", () => listDevices(activeInvestigationId), { devices: [] }) : Promise.resolve({ devices: [] }),
           activeInvestigationId ? optional<{ workflow: Workflow | null }>("workflow", () => getWorkflow(activeInvestigationId), { workflow: null }) : Promise.resolve({ workflow: null }),
@@ -503,7 +518,7 @@ function AppConsole({ role, onLogout }: { role: Exclude<Role, "gateway">; onLogo
           activeInvestigationId ? optional("sanitization", () => listSanitizationJobs(activeInvestigationId), { sanitizationJobs: [] }) : Promise.resolve({ sanitizationJobs: [] }),
         ]);
         if (!active) return;
-        setSnapshot({ user: userResult.user, health: healthResult, investigations: investigationsResult.investigations, investigators: investigatorsResult.users, authorizations: authorizationsResult.authorizations, devices: devicesResult.devices, workflow: workflowResult.workflow, acquisitions: acquisitionsResult.acquisitions, workingCopies: workingCopiesResult.workingCopies, recoveryJobs: recoveryJobsResult.recoveryJobs, certificates: certificatesResult.certificates, sanitizationJobs: sanitizationJobsResult.sanitizationJobs, unavailable, loading: false, error: null });
+        setSnapshot({ user: userResult.user, health: healthResult, investigations: investigationsResult.investigations, investigators: investigatorsResult.investigators, authorizations: authorizationsResult.authorizations, devices: devicesResult.devices, workflow: workflowResult.workflow, acquisitions: acquisitionsResult.acquisitions, workingCopies: workingCopiesResult.workingCopies, recoveryJobs: recoveryJobsResult.recoveryJobs, certificates: certificatesResult.certificates, sanitizationJobs: sanitizationJobsResult.sanitizationJobs, unavailable, loading: false, error: null });
       } catch (error) {
         if (active) setSnapshot((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : "Unable to load the authenticated backend session." }));
       }
@@ -521,7 +536,7 @@ function AppConsole({ role, onLogout }: { role: Exclude<Role, "gateway">; onLogo
   };
   const renderPage = () => {
     if (page === "dashboard") return isAdmin ? <AdminDashboard onNavigate={navigate} snapshot={snapshot} /> : <InvestigatorDashboard onNavigate={navigate} snapshot={snapshot} />;
-    if (page === "investigations") return <InvestigationsPage snapshot={snapshot} />;
+    if (page === "investigations") return <InvestigationsPage snapshot={snapshot} canCreate={isAdmin} />;
     if (page === "evidence") return <EvidencePage />;
     if (page === "devices") return <DevicesPage snapshot={snapshot} />;
     if (page === "assignment") return isAdmin ? <AssignmentPage snapshot={snapshot} /> : <InvestigatorDashboard onNavigate={navigate} snapshot={snapshot} />;

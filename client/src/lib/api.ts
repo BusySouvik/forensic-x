@@ -7,6 +7,20 @@ export type ApiUser = {
   role: ApiRole;
 };
 
+export type Investigator = {
+  id: string;
+  email: string;
+  name: string;
+  role: "INVESTIGATOR";
+  investigatorId?: string | null;
+  contactNumber?: string | null;
+  designation?: string | null;
+  department?: string | null;
+  specialization?: string | null;
+  status?: string | null;
+  createdAt?: string;
+};
+
 export type Investigation = {
   id: string;
   investigationNumber: string;
@@ -192,9 +206,18 @@ export async function getHealth() {
 export async function listInvestigations() {
   return request<{ investigations: Investigation[] }>("/investigations");
 }
+export async function createInvestigation(input: { investigationNumber: string; title: string; description?: string; status?: Investigation["status"] }) {
+  return request<{ investigation: Investigation }>("/investigations", { method: "POST", body: JSON.stringify(input) });
+}
 
 export async function listInvestigators() {
-  return request<{ users: Array<{ id: string; name: string }> }>("/admin/investigators");
+  return request<{ investigators: Investigator[] }>("/admin/investigators");
+}
+export async function createInvestigator(input: { name: string; email: string; password: string; investigatorId: string; contactNumber: string; designation: string; department: string; specialization?: string; joiningDate?: string }) {
+  return request<{ investigator: Investigator }>("/admin/investigators", { method: "POST", body: JSON.stringify(input) });
+}
+export async function updateInvestigatorStatus(id: string, status: "ACTIVE" | "INACTIVE" | "ON_LEAVE") {
+  return request<{ investigator: Investigator }>(`/admin/investigators/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
 }
 
 export async function listAuthorizations(status?: string) {

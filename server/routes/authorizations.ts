@@ -16,6 +16,7 @@ import {
   listAuthorizationsForInvestigation,
   requestAuthorization,
 } from "../services/authorizations";
+import { assertInvestigationAccess } from "../services/investigations";
 
 export const authorizationsRouter = Router();
 
@@ -24,6 +25,7 @@ authorizationsRouter.get(
   requireAuth,
   validate(investigationIdParamSchema, "params"),
   asyncHandler(async (req, res) => {
+    await assertInvestigationAccess(req.params.investigationId, { id: req.user!.sub, role: req.user!.role });
     const items = await listAuthorizationsForInvestigation(req.params.investigationId);
     res.json({ authorizations: items });
   }),
@@ -35,6 +37,7 @@ authorizationsRouter.post(
   validate(investigationIdParamSchema, "params"),
   validate(createAuthorizationSchema),
   asyncHandler(async (req, res) => {
+    await assertInvestigationAccess(req.params.investigationId, { id: req.user!.sub, role: req.user!.role });
     const authorization = await requestAuthorization({
       investigationId: req.params.investigationId,
       deviceId: req.body.deviceId,

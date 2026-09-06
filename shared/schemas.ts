@@ -45,6 +45,20 @@ export const createInvestigatorSchema = z.object({
   joiningDate: z.iso.datetime().optional().nullable(),
 });
 
+export const investigatorUpdateSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  email: z.email().optional(),
+  contactNumber: z.string().trim().min(1).max(40).optional(),
+  designation: z.string().trim().min(1).max(120).optional(),
+  department: z.string().trim().min(1).max(120).optional(),
+  specialization: z.string().trim().max(160).optional().nullable(),
+  joiningDate: z.iso.datetime().optional().nullable(),
+}).refine((value) => Object.keys(value).length > 0, { message: "At least one field is required" });
+
+export const investigatorStatusSchema = z.object({
+  status: z.enum(["ACTIVE", "INACTIVE", "ON_LEAVE"]),
+});
+
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1),
   newPassword: z.string().min(8),

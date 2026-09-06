@@ -13,7 +13,7 @@ import { validate } from "../middleware/validate";
 import { getDefaultAcquisitionRepository, logAcquisitionAudit, createAcquisitionService } from "../services/acquisitions";
 import { getEvidenceStorageService } from "../services/evidenceStorage";
 import { getDevice } from "../services/devices";
-import { getInvestigation } from "../services/investigations";
+import { assertInvestigationAccess, getInvestigation } from "../services/investigations";
 import { assertStageAccess } from "../services/investigationWorkflow";
 
 export const acquisitionsRouter = Router();
@@ -50,6 +50,7 @@ acquisitionsRouter.get(
     if (!investigationId) {
       throw new HttpError(400, "investigationId query is required");
     }
+    await assertInvestigationAccess(investigationId, { id: req.user!.sub, role: req.user!.role });
     const items = await acquisitionService.listForInvestigation(investigationId);
     res.json({ acquisitions: items });
   }),
@@ -62,7 +63,7 @@ acquisitionsRouter.post(
   validate(createAcquisitionSchema),
   asyncHandler(async (req, res) => {
     const { investigationId, deviceId, authorizationId, sourceType, sourceIdentifier } = req.body;
-    await getInvestigation(investigationId);
+    await assertInvestigationAccess(investigationId, { id: req.user!.sub, role: req.user!.role });
     await assertStageAccess(investigationId, req.user!.sub, "ACQUISITION");
     if (deviceId) {
       const device = await getDevice(deviceId);

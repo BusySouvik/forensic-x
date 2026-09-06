@@ -637,3 +637,20 @@ tbody tr:hover, tbody tr.selected-row { background: rgba(98, 223, 206, .055); }
   .page-header h1 { font-size: 30px; }
   .pipeline-panel { margin-left: 0; margin-right: 0; }
 }
+
+.modal-backdrop { align-items: center; background: rgba(2, 7, 11, .78); display: flex; inset: 0; justify-content: center; padding: 20px; position: fixed; z-index: 30; }
+.modal-panel { background: #0d1822; border: 1px solid var(--fx-line-strong); border-radius: 8px; box-shadow: 0 30px 100px rgba(0, 0, 0, .55); max-height: min(880px, calc(100vh - 40px)); max-width: 620px; overflow: auto; width: 100%; }
+.modal-header { align-items: flex-start; border-bottom: 1px solid var(--fx-line); display: flex; justify-content: space-between; padding: 22px 24px 18px; }
+.modal-header h2 { color: var(--fx-ink); font-size: 24px; font-weight: 520; letter-spacing: -.04em; margin-top: 7px; }
+.modal-form { display: grid; gap: 14px; padding: 22px 24px 24px; }
+.modal-form label { color: #8da6ae; display: flex; flex-direction: column; font-family: "IBM Plex Mono", monospace; font-size: 8px; gap: 7px; letter-spacing: .1em; }
+.modal-form input, .modal-form select, .modal-form textarea { background: #09131c; border: 1px solid var(--fx-line-strong); border-radius: 5px; color: #dcebea; min-height: 39px; padding: 9px 11px; resize: vertical; }
+.modal-form textarea { min-height: 86px; }
+.modal-form input::placeholder, .modal-form textarea::placeholder { color: #4f6873; }
+.form-section-label { border-top: 1px solid var(--fx-line); color: var(--fx-teal); font-family: "IBM Plex Mono", monospace; font-size: 8px; font-weight: 700; letter-spacing: .15em; margin-top: 5px; padding-top: 14px; }
+.field-help { color: #5e7881; font-family: inherit; font-size: 9px; letter-spacing: 0; line-height: 1.45; text-transform: none; }
+.modal-actions { border-top: 1px solid var(--fx-line); display: flex; gap: 9px; justify-content: flex-end; margin-top: 5px; padding-top: 17px; }
+.status-select { background: #0b1620; border: 1px solid var(--fx-line); border-radius: 4px; color: #b8d4d3; min-height: 31px; padding: 0 8px; }
+@media (max-width: 600px) { .modal-backdrop { padding: 10px; } .modal-panel { max-height: calc(100vh - 20px); } .modal-header, .modal-form { padding-left: 18px; padding-right: 18px; } }
+.modal-select-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 600px) { .modal-select-grid { grid-template-columns: 1fr; } }
