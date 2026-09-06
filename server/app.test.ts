@@ -76,7 +76,7 @@ describe("invalid request validation", () => {
   it("rejects an empty investigation payload", async () => {
     const response = await request(app)
       .post("/api/investigations")
-      .set(authHeader("INVESTIGATOR"))
+      .set(authHeader("ADMIN"))
       .send({});
     expect(response.status).toBe(400);
     expect(response.body.error).toBe("Validation failed");
@@ -127,14 +127,12 @@ describe("storage API authorization", () => {
 });
 
 describe("recovery results preview API", () => {
-  it("returns a pending-validation empty state for recovery job artifacts", async () => {
+  it("returns 404 for an unknown recovery job", async () => {
     const response = await request(app)
       .get("/api/investigations/11111111-1111-4111-8111-111111111111/recovery-jobs/22222222-2222-4222-8222-222222222222/results")
       .set(authHeader("INVESTIGATOR"));
 
-    expect(response.status).toBe(200);
-    expect(response.body.status).toBe("PENDING_VALIDATION");
-    expect(response.body.artifacts).toEqual([]);
-    expect(response.body.message).toContain("pending validation");
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe("Recovery job not found");
   });
 });
