@@ -424,7 +424,7 @@ function AppConsole({ role, onLogout }: { role: Exclude<Role, "gateway">; onLogo
       try {
         const userResult = await getCurrentUser();
         const investigationsResult = await listInvestigations();
-        const first = investigationsResult.investigations[0];
+        const activeInvestigationId = investigationsResult.investigations.find((investigation) => Boolean(investigation.id))?.id;
         const unavailable: string[] = [];
         const optional = async <T,>(label: string, task: () => Promise<T>, emptyValue: T) => {
           try { return await task(); } catch (error) {
@@ -437,13 +437,13 @@ function AppConsole({ role, onLogout }: { role: Exclude<Role, "gateway">; onLogo
           optional("health", getHealth, null),
           isAdmin ? optional("investigators", listInvestigators, { users: [] }) : Promise.resolve({ users: [] }),
           isAdmin ? optional("authorizations", () => listAuthorizations(), { authorizations: [] }) : Promise.resolve({ authorizations: [] }),
-          first ? optional("devices", () => listDevices(first.id), { devices: [] }) : Promise.resolve({ devices: [] }),
-          first ? optional<{ workflow: Workflow | null }>("workflow", () => getWorkflow(first.id), { workflow: null }) : Promise.resolve({ workflow: null }),
-          first ? optional("acquisitions", () => listAcquisitions(first.id), { acquisitions: [] }) : Promise.resolve({ acquisitions: [] }),
-          first ? optional("working copies", () => listWorkingCopies(first.id), { workingCopies: [] }) : Promise.resolve({ workingCopies: [] }),
-          first ? optional("recovery jobs", () => listRecoveryJobs(first.id), { recoveryJobs: [] }) : Promise.resolve({ recoveryJobs: [] }),
-          first ? optional("recovery certificates", () => listRecoveryCertificates(first.id), { certificates: [] }) : Promise.resolve({ certificates: [] }),
-          first ? optional("sanitization", () => listSanitizationJobs(first.id), { sanitizationJobs: [] }) : Promise.resolve({ sanitizationJobs: [] }),
+          activeInvestigationId ? optional("devices", () => listDevices(activeInvestigationId), { devices: [] }) : Promise.resolve({ devices: [] }),
+          activeInvestigationId ? optional<{ workflow: Workflow | null }>("workflow", () => getWorkflow(activeInvestigationId), { workflow: null }) : Promise.resolve({ workflow: null }),
+          activeInvestigationId ? optional("acquisitions", () => listAcquisitions(activeInvestigationId), { acquisitions: [] }) : Promise.resolve({ acquisitions: [] }),
+          activeInvestigationId ? optional("working copies", () => listWorkingCopies(activeInvestigationId), { workingCopies: [] }) : Promise.resolve({ workingCopies: [] }),
+          activeInvestigationId ? optional("recovery jobs", () => listRecoveryJobs(activeInvestigationId), { recoveryJobs: [] }) : Promise.resolve({ recoveryJobs: [] }),
+          activeInvestigationId ? optional("recovery certificates", () => listRecoveryCertificates(activeInvestigationId), { certificates: [] }) : Promise.resolve({ certificates: [] }),
+          activeInvestigationId ? optional("sanitization", () => listSanitizationJobs(activeInvestigationId), { sanitizationJobs: [] }) : Promise.resolve({ sanitizationJobs: [] }),
         ]);
         if (!active) return;
         setSnapshot({ user: userResult.user, health: healthResult, investigations: investigationsResult.investigations, investigators: investigatorsResult.users, authorizations: authorizationsResult.authorizations, devices: devicesResult.devices, workflow: workflowResult.workflow, acquisitions: acquisitionsResult.acquisitions, workingCopies: workingCopiesResult.workingCopies, recoveryJobs: recoveryJobsResult.recoveryJobs, certificates: certificatesResult.certificates, sanitizationJobs: sanitizationJobsResult.sanitizationJobs, unavailable, loading: false, error: null });
