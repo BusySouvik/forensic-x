@@ -9,7 +9,7 @@ import {
 import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler } from "../middleware/errorHandler";
 import { validate } from "../middleware/validate";
-import { createInvestigation, getInvestigation, listInvestigations, updateInvestigation } from "../services/investigations";
+import { assertInvestigationAccess, createInvestigation, getInvestigation, listInvestigations, updateInvestigation } from "../services/investigations";
 import { configureWorkflow, getWorkflow } from "../services/investigationWorkflow";
 
 export const investigationsRouter = Router();
@@ -60,6 +60,7 @@ investigationsRouter.patch(
 );
 
 investigationsRouter.get("/investigations/:investigationId/workflow", requireAuth, validate(investigationIdParamSchema, "params"), asyncHandler(async (req, res) => {
+  await assertInvestigationAccess(req.params.investigationId, { id: req.user!.sub, role: req.user!.role });
   res.json({ workflow: await getWorkflow(req.params.investigationId) });
 }));
 

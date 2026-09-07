@@ -1,15 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
 import { getDb } from "../db";
 import * as schema from "../db/schema";
 import { eq } from "drizzle-orm";
 import { recordAcquisitionEvent } from "./ledger";
 
-const investigationId = "deadbeef-aaaa-4111-8111-deadbeef0001";
+let investigationId = randomUUID();
 const adminId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-const jobId = "deadbeef-bbbb-4222-8222-deadbeef0002";
-const authId = "deadbeef-cccc-4555-8555-deadbeef0003";
-const storageObjectId = "deadbeef-dddd-4666-8666-deadbeef0004";
-const evidenceId = "deadbeef-eeee-4333-8333-deadbeef0005";
+let jobId = randomUUID();
+let authId = randomUUID();
+let storageObjectId = randomUUID();
+let storageObjectKey = `ledger-conc-${storageObjectId}`;
+let evidenceId = randomUUID();
 
 async function cleanupFixture() {
   const db = getDb();
@@ -25,14 +27,21 @@ beforeEach(async () => {
   const db = getDb();
   await cleanupFixture();
 
+  investigationId = randomUUID();
+  jobId = randomUUID();
+  authId = randomUUID();
+  storageObjectId = randomUUID();
+  storageObjectKey = `ledger-conc-${storageObjectId}`;
+  evidenceId = randomUUID();
+
   // Insert base fixtures
   const [existingUser] = await db.select().from(schema.users).where(eq(schema.users.id, adminId)).limit(1);
   if (!existingUser) {
     await db.insert(schema.users).values({ id: adminId, email: "a@test", passwordHash: "", name: "Admin", role: "ADMIN" }).returning();
   }
-  await db.insert(schema.investigations).values({ id: investigationId, investigationNumber: "CONC-1", title: "Concurrency test", description: "", createdBy: adminId }).returning();
+  await db.insert(schema.investigations).values({ id: investigationId, investigationNumber: `CONC-${investigationId}`, title: "Concurrency test", description: "", createdBy: adminId }).returning();
   await db.insert(schema.operationAuthorizations).values({ id: authId, investigationId, deviceId: null, requestedBy: adminId, approvedBy: null, operationType: "ACQUISITION", reason: "ledger concurrency test", status: "APPROVED" }).returning();
-  await db.insert(schema.storageObjects).values({ id: storageObjectId, investigationId, storageClass: "FORENSIC_IMAGE", bucket: "test", objectKey: "ledger-conc", originalFilename: "acq.img", contentType: "application/octet-stream", fileSizeBytes: 123, sha256: "msha1" }).returning();
+  await db.insert(schema.storageObjects).values({ id: storageObjectId, investigationId, storageClass: "FORENSIC_IMAGE", bucket: "test", objectKey: storageObjectKey, originalFilename: "acq.img", contentType: "application/octet-stream", fileSizeBytes: 123, sha256: "msha1" }).returning();
   await db.insert(schema.acquisitionJobs).values({ id: jobId, investigationId, deviceId: null, requestedBy: adminId, authorizationId: authId, sourceType: "TEST_FILE", sourceIdentifier: "x", outputStorageObjectId: null, sha256: null, size: null, startedAt: null, completedAt: null, errorMessage: null, createdAt: new Date(), updatedAt: new Date() }).returning();
   await db.insert(schema.evidenceRecords).values({ id: evidenceId, investigationId, acquisitionJobId: jobId, masterStorageObjectId: storageObjectId, sha256: "msha1", size: 123, status: "AVAILABLE", createdAt: new Date() }).returning();
 });

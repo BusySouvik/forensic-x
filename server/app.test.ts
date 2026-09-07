@@ -100,13 +100,13 @@ describe("invalid request validation", () => {
     expect(response.body.error).toBe("Validation failed");
   });
 
-  it("rejects a device payload missing required fields", async () => {
+  it("forbids investigators from registering device records", async () => {
     const response = await request(app)
       .post("/api/investigations/33333333-3333-4333-8333-333333333333/devices")
       .set(authHeader("INVESTIGATOR"))
-      .send({ manufacturer: "Example" });
-    expect(response.status).toBe(400);
-    expect(response.body.error).toBe("Validation failed");
+      .send({ deviceIdentifier: "disk-1", deviceType: "HDD" });
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe("Insufficient permissions");
   });
 });
 

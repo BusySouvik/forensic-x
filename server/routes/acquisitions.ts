@@ -114,6 +114,10 @@ acquisitionsRouter.get(
   validate(idParamSchema, "params"),
   asyncHandler(async (req, res) => {
     const job = await acquisitionService.getById(req.params.id);
+    await assertInvestigationAccess(job.investigationId, { id: req.user!.sub, role: req.user!.role });
+    if (req.user!.role !== "ADMIN" && job.requestedBy !== req.user!.sub) {
+      throw new HttpError(403, "Acquisition job is not accessible to this investigator");
+    }
     res.json({ acquisition: job });
   }),
 );

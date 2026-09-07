@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { createDeviceSchema, idParamSchema, investigationIdParamSchema } from "../../shared/schemas";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler } from "../middleware/errorHandler";
 import { validate } from "../middleware/validate";
 import { createDevice, getDevice, listDevicesForInvestigation } from "../services/devices";
@@ -22,6 +22,7 @@ devicesRouter.get(
 devicesRouter.post(
   "/investigations/:investigationId/devices",
   requireAuth,
+  requireRole("ADMIN"),
   validate(investigationIdParamSchema, "params"),
   validate(createDeviceSchema),
   asyncHandler(async (req, res) => {
@@ -37,6 +38,7 @@ devicesRouter.get(
   validate(idParamSchema, "params"),
   asyncHandler(async (req, res) => {
     const device = await getDevice(req.params.id);
+    await assertInvestigationAccess(device.investigationId, { id: req.user!.sub, role: req.user!.role });
     res.json({ device });
   }),
 );
